@@ -86,6 +86,12 @@ mkdir -p ~/.local/share/icons/hicolor/scalable/apps
 cp org.nan.usage/contents/icons/nan.svg ~/.local/share/icons/hicolor/scalable/apps/nan.svg
 ```
 
+### Sin git
+
+Descargá el código de la
+[última release](https://github.com/luciferfran/kde-nan-usage/releases/latest)
+(botón «Source code»), descomprimilo y dentro de la carpeta ejecutá `./install.sh`.
+
 Después **reiniciá Plasma** o cerrá y volvé a entrar para que el widget aparezca.
 En Wayland, Plasma no recarga QML en caliente.
 
