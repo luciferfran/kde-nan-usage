@@ -1,0 +1,29 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "luciferfran"
+            },
+            {
+                "Name": "prgr1no (gnome-nan-usage)"
+            }
+        ],
+        "Category": "System Information",
+        "Description": "NaN usage quota in your panel: per-model usage, time to reset, and burn-rate alerts.",
+        "Description[es]": "Cuota de uso de NaN en tu panel: uso por modelo, tiempo hasta el reset y avisos por ritmo de consumo.",
+        "EnabledByDefault": true,
+        "Icon": "nan",
+        "Id": "org.nan.usage",
+        "License": "GPL-2.0-or-later",
+        "Name": "NaN Usage",
+        "Name[es]": "Uso de NaN",
+        "Version": "0.1.0",
+        "Website": "https://github.com/luciferfran/kde-nan-usage"
+    },
+    "X-Plasma-API": "declarativeappletscript",
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "X-Plasma-MainScript": "ui/main.qml",
+    "X-Plasma-NotificationArea": true,
+    "X-Plasma-NotificationAreaCategory": "ApplicationStatus"
+}

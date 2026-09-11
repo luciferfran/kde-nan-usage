@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
+      http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+  <kcfgfile name=""/>
+
+  <group name="General">
+    <entry name="keyPath" type="String">
+      <label>Path to the file that contains the NaN API key.</label>
+      <default>~/.config/nan/api-key</default>
+    </entry>
+
+    <entry name="pollSeconds" type="Int">
+      <label>Seconds between polls.</label>
+      <default>300</default>
+      <min>60</min>
+      <max>1800</max>
+    </entry>
+
+    <entry name="panelModel" type="String">
+      <label>Model reflected in the panel: worst, max or fixed.</label>
+      <default>worst</default>
+    </entry>
+
+    <entry name="panelModelId" type="String">
+      <label>Model id used when panelModel is fixed.</label>
+      <default>deepseek-v4-flash</default>
+    </entry>
+
+    <entry name="panelGauge" type="String">
+      <label>Gauge style in the panel: ring, bar or none.</label>
+      <default>ring</default>
+    </entry>
+
+    <entry name="showIcon" type="Bool">
+      <label>Show the NaN icon in the panel.</label>
+      <default>true</default>
+    </entry>
+
+    <entry name="showPercentage" type="Bool">
+      <label>Show the utilization percentage in the panel.</label>
+      <default>true</default>
+    </entry>
+
+    <entry name="showReset" type="Bool">
+      <label>Show the time until reset in the panel.</label>
+      <default>true</default>
+    </entry>
+
+    <entry name="hideUnused" type="Bool">
+      <label>Hide models with zero usage in the popup.</label>
+      <default>true</default>
+    </entry>
+
+    <entry name="showMetrics" type="Bool">
+      <label>Show aggregated usage (24 h, month, 30 days) in the popup.</label>
+      <default>true</default>
+    </entry>
+  </group>
+</kcfg>

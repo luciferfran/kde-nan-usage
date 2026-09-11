@@ -1,0 +1,19 @@
+# Local Pi runtime state
+.atl/
+
+# Editor and OS cruft
+*~
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# QML/JS leftovers
+*.qmlc
+*.jsc
+*.log
+build/
+node_modules/
+__pycache__/
