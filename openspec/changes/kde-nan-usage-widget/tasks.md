@@ -53,6 +53,8 @@ Legend: `[ ]` pending, `[~]` in progress, `[x]` done, `[!]` blocked.
 - [x] 5.3 Added `LICENSE` (GPL-2.0-or-later, matching the reference project).
 - [x] 5.4 Added `scripts/install-online.sh` for the one-line install and
   documented it at the top of the README.
+- [x] 5.5 Added `CHANGELOG.md`, a GitHub Actions workflow (Node tests and
+  `qmllint`) and a CI badge in the README.
 
 ## Phase 6: Verification
 

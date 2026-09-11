@@ -26,6 +26,8 @@ screenshots.
 | `org.nan.usage/tests/nanClient.test.js` | Client helper tests |
 | `install.sh` | Dev symlink/copy/uninstall |
 | `scripts/install-online.sh` | One-line online installer |
+| `.github/workflows/ci.yml` | CI: Node tests + syntax-only qmllint |
+| `CHANGELOG.md` | Keep a Changelog history |
 | `screenshots/*.png` | README screenshots |
 | `README.md`, `LICENSE` | Docs and license |
 
