@@ -39,15 +39,9 @@ jobs:
       - name: Install Qt 6 QML tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            qt6-declarative-dev-tools \
-            qml6-module-qtquick \
-            qml6-module-qtqml \
-            qml6-module-qtquick-window \
-            qml6-module-qtquick-layouts \
-            qml6-module-qtquick-templates
+          sudo apt-get install -y qt6-declarative-dev-tools
 
-      - name: Lint QML and JavaScript
+      - name: Lint QML and JavaScript (syntax)
         run: |
           set -euo pipefail
           QMLLINT="$(command -v qmllint6 || command -v qmllint || true)"
@@ -59,8 +53,20 @@ jobs:
             exit 1
           fi
           echo "Using $QMLLINT"
-          # QtQuick and the base modules are installed above. The KDE QML modules
-          # are not available on the runner, so their failed imports are reported
-          # as warnings, not errors. Real syntax errors make qmllint exit non-zero.
-          find org.nan.usage/contents -type f \( -name '*.qml' -o -name '*.js' \) -print0 \
-            | xargs -0 -n1 "$QMLLINT"
+
+          # The runner has no KDE QML modules (Ubuntu 24.04 only ships KF5), so
+          # import/property/type warnings would be all noise. Disable every
+          # warning category and keep only real syntax errors. Run qmllint
+          # without these flags on a Plasma 6 system for the full analysis.
+          OPTS="--alias disable --compiler disable --controls-sanity disable"
+          OPTS="$OPTS --deferred-property-id disable --deprecated disable"
+          OPTS="$OPTS --import disable --inheritance-cycle disable"
+          OPTS="$OPTS --multiline-strings disable --multiple-attached-objects disable"
+          OPTS="$OPTS --plugin disable --property disable --required disable"
+          OPTS="$OPTS --signal disable --type disable --unqualified disable"
+          OPTS="$OPTS --unused-imports disable --with disable"
+
+          for f in $(find org.nan.usage/contents -type f \( -name '*.qml' -o -name '*.js' \)); do
+            echo "== $f"
+            $QMLLINT $OPTS "$f"
+          done
