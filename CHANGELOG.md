@@ -3,7 +3,47 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/);
 versionado [SemVer](https://semver.org/lang/es/).
 
-## [No publicado]
+## [0.2.0] - 2026-09-11
+
+Mejoras de calidad: seguridad, error handling, CI/CD, tests y modernización JS.
+
+### Añadido
+
+- **Seguridad**: validación de rutas de API key contra path traversal, rutas
+  absolutas e inyección shell (`isValidKeyPath`).
+- **Seguridad**: validación de estructura de respuesta de API antes de pasar
+  datos a consumidores (`validateResponse`).
+- **Seguridad**: timeout dinámico basado en `pollSeconds` (70% del intervalo,
+  entre 5s y 15s).
+- **Seguridad**: verificación de permisos de fichero de API key en `install.sh`
+  (alerta si no es 600/400).
+- **Error handling**: clasificación de UI states (`waiting-for-key`,
+  `no-api-key`, `api-error`, `ok`) para mensajes claros al usuario.
+- **Error handling**: preservación de caché cuando falta la key (no se borra
+  `windows`, se marca `stale = true`).
+- **Error handling**: cooldown dinámico basado en `pollTimer.interval` en vez
+  de 30s fijos.
+- **CI/CD**: lint con Biome, validación de estructura QML, tests de Node.
+- **Tests**: +31 tests para `quotaModel`, +14 tests para `nanClient`.
+- **Modernización**: reemplazo de `var` por `const`/`let`, template literals,
+  optional chaining, `biome.json` configurado.
+- **Documentación**: README en inglés (`README.en.md`), enlace de referido,
+  sección de seguridad en README.
+
+### Cambiado
+
+- `install.sh`: la función `check_key_perms()` verifica y ajusta permisos de la
+  API key al instalar.
+- Cooldown entre sondeos: usa `pollTimer.interval` (configurable vía
+  `pollSeconds`) en vez de 30s hardcodeados.
+
+### Fijo
+
+- `main.qml`: al perder la API key, conserva datos en caché en vez de borrarlos.
+- `biome.json`: corrección de tabs a spaces (fallaba el CI).
+
+[0.2.0]: https://github.com/luciferfran/kde-nan-usage/compare/v0.1.0...v0.2.0
+[No publicado]: https://github.com/luciferfran/kde-nan-usage/compare/v0.2.0...HEAD
 
 ## [0.1.0] - 2026-09-11
 

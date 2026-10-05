@@ -18,7 +18,7 @@
         "License": "GPL-2.0-or-later",
         "Name": "NaN Usage",
         "Name[es]": "Uso de NaN",
-        "Version": "0.1.0",
+        "Version": "0.2.0",
         "Website": "https://github.com/luciferfran/kde-nan-usage"
     },
     "X-Plasma-API": "declarativeappletscript",

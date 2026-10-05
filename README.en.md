@@ -186,6 +186,19 @@ journalctl --user -b -o cat /usr/bin/plasmashell | grep -i nan-usage
 kpackagetool6 --type Plasma/Applet --remove org.nan.usage
 ```
 
+## Security
+
+- The API key **never** appears in logs or error messages.
+- The key file path is validated: no path traversal (`..`), no absolute paths
+  outside `$HOME`, no shell injection characters (`` ` ``, `;`, `|`, `&`).
+- API responses are validated before processing.
+- Network timeout adjusts dynamically to the poll interval (70 %, between 5 and
+  15 s).
+- `install.sh` warns if the API key file has insecure permissions (must be 600
+  or 400).
+- All traffic goes directly to NaN; the widget stores no data and sends nothing
+  to third parties.
+
 ## Privacy
 
 All traffic goes from your machine to NaN, with your key. The widget sends no
