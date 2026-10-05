@@ -8,6 +8,8 @@ Muestra en el panel el porcentaje del modelo que peor va, los días hasta el
 reset y, al hacer clic, un popup con una barra por modelo, la proyección del
 ritmo de consumo y el consumo agregado de las últimas 24 h, el mes y 30 días.
 
+¿Todavía no tenés cuenta en NaN? Usá [este enlace de referido](https://cloud.nan.builders/r/BM7BJE4M) para registrarte.
+
 <p align="center">
   <a href="https://github.com/luciferfran/kde-nan-usage/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/luciferfran/kde-nan-usage/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="Licencia GPL-2.0-or-later" src="https://img.shields.io/badge/licencia-GPL--2.0--or--later-blue.svg">
