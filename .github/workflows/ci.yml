@@ -21,15 +21,39 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "20"
+          cache: "npm"
 
-      - name: Quota model tests
-        run: node org.nan.usage/tests/quotaModel.test.js
+      - name: Install deps
+        run: npm ci
 
-      - name: Client helper tests
-        run: node org.nan.usage/tests/nanClient.test.js
+      - name: Run tests
+        run: npm test
+
+  lint:
+    name: Lint & format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Run biome check (lint + format)
+        run: npx biome check --write org.nan.usage/
+
+      - name: Verify no changes needed
+        run: git diff --exit-code --stat || (echo "Changes detected — run \`npm run lint\` and \`npm run format\` locally" && exit 1)
 
   qmllint:
-    name: qmllint
+    name: QML lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -70,3 +94,14 @@ jobs:
             echo "== $f"
             $QMLLINT $OPTS "$f"
           done
+
+  qml-structure:
+    name: QML structure validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Validate QML structure
+        run: node scripts/validate-qml.js
