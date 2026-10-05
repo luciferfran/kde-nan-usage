@@ -30,6 +30,13 @@ PlasmoidItem {
     // Ticks so time-based bindings refresh without a network request.
     property double nowMs: Date.now()
 
+    // Request timeout: 70% of poll interval, capped at 15s, minimum 5s.
+    // This prevents requests from timing out after the next poll is scheduled.
+    readonly property int requestTimeoutMs: Math.min(
+        Math.max(5000, Math.round(root.cfgPollSeconds * 1000 * 0.7)),
+        15000
+    )
+
     // --- Configuration mirrors (react to changes from the config dialog) ---
     property string cfgKeyPath: Plasmoid.configuration.keyPath
     property int cfgPollSeconds: Plasmoid.configuration.pollSeconds
@@ -162,7 +169,7 @@ PlasmoidItem {
             root.apiErrorMessage = NanClient.describeError(err);
             root.stale = root.windows.length > 0;
             root.refreshing = false;
-        });
+        }, root.requestTimeoutMs);
     }
 
     function fetchMetrics() {
@@ -172,7 +179,7 @@ PlasmoidItem {
             root.metrics = data;
         }, function () {
             // Aggregated metrics are optional: ignore failures.
-        });
+        }, root.requestTimeoutMs);
     }
 
     function fetchAccount() {
@@ -182,7 +189,7 @@ PlasmoidItem {
             root.account = data;
         }, function () {
             // Account details are optional: ignore failures.
-        });
+        }, root.requestTimeoutMs);
     }
 
     // --- Lifecycle ---

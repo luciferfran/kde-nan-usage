@@ -94,7 +94,8 @@ function keyCommand(path) {
 // GET path with the given API key. Calls onSuccess(parsedBody) or onError(err)
 // exactly once. The error object carries {status, kind, message} and is safe to
 // pass to describeError().
-function request(path, key, onSuccess, onError) {
+// timeoutMs: optional request timeout in ms (default 15000).
+function request(path, key, onSuccess, onError, timeoutMs) {
     const xhr = new XMLHttpRequest()
     let finished = false
 
@@ -160,20 +161,20 @@ function request(path, key, onSuccess, onError) {
     xhr.ontimeout = () => {
         fail({ status: 0, kind: "timeout", message: "Timeout" })
     }
-    xhr.timeout = 15000
+    xhr.timeout = timeoutMs ?? 15000
     xhr.send()
 }
 
-function fetchQuota(key, onSuccess, onError) {
-    request("/api/usage/quota", key, onSuccess, onError)
+function fetchQuota(key, onSuccess, onError, timeoutMs) {
+    request("/api/usage/quota", key, onSuccess, onError, timeoutMs)
 }
 
-function fetchMe(key, onSuccess, onError) {
-    request("/api/auth/me", key, onSuccess, onError)
+function fetchMe(key, onSuccess, onError, timeoutMs) {
+    request("/api/auth/me", key, onSuccess, onError, timeoutMs)
 }
 
-function fetchMetrics(key, onSuccess, onError) {
-    request("/api/metrics/usage", key, onSuccess, onError)
+function fetchMetrics(key, onSuccess, onError, timeoutMs) {
+    request("/api/metrics/usage", key, onSuccess, onError, timeoutMs)
 }
 
 if (typeof module !== "undefined" && module.exports) {
