@@ -49,6 +49,18 @@ PlasmoidItem {
             root.fetchMetrics();
     }
 
+    // --- UI state classification ---
+    // Distinguishes "waiting for key" (no key read yet) from
+    // "nokey" (key file missing) and from network/server errors.
+    readonly property string uiState: root.apiErrorMessage === ""
+        && !root.keyReading && root.apiKey === ""
+        ? "waiting-for-key"       // key file not yet read
+        : root.apiErrorMessage === "nokey"
+        ? "no-api-key"            // key file present but empty / unreadable
+        : root.apiErrorMessage !== ""
+        ? "api-error"             // network / server error
+        : "ok"                    // healthy
+
     // --- Derived panel state ---
     readonly property var panelWindow: QuotaModel.selectPanelWindow(
         root.windows,
@@ -67,9 +79,18 @@ PlasmoidItem {
     readonly property string resetText: root.resetMs > 0
         ? QuotaModel.humanDuration(root.resetMs, true)
         : ""
-    readonly property string errorText: root.apiErrorMessage === "nokey"
+    // Short label used in fullRepresentation error display.
+    readonly property string errorLabel: {
+        if (root.uiState === "api-error")
+            return root.apiErrorMessage
+        return ""
+    }
+    // Localized error text used in tooltips.
+    readonly property string errorText: root.uiState === "no-api-key"
         ? i18n("No se encontró la API key en %1", root.cfgKeyPath)
-        : root.apiErrorMessage
+        : root.uiState === "api-error"
+        ? root.apiErrorMessage
+        : ""
 
     // --- Timers ---
     Timer {
@@ -111,8 +132,9 @@ PlasmoidItem {
             if (key.length === 0) {
                 root.apiKey = "";
                 root.apiErrorMessage = "nokey";
-                root.stale = false;
-                root.windows = [];
+                // Preserve cached windows but mark them as stale only
+                // when we actually have previous data to show.
+                root.stale = root.windows.length > 0;
             } else {
                 root.apiKey = key;
                 root.apiErrorMessage = "";
@@ -144,9 +166,9 @@ PlasmoidItem {
 
         var now = Date.now();
         var elapsed = now - root.lastRequestMs;
-        if (elapsed < 30000) {
+        if (elapsed < pollTimer.interval) {
             if (force) {
-                cooldownTimer.interval = 30000 - elapsed;
+                cooldownTimer.interval = pollTimer.interval - elapsed;
                 cooldownTimer.restart();
             }
             return;
