@@ -20,7 +20,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
 
       - name: Install deps
@@ -28,6 +28,9 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+      - name: Validate QML structure
+        run: npm run validate
 
   lint:
     name: Lint & format
@@ -40,17 +43,25 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
 
       - name: Install deps
         run: npm ci
 
-      - name: Run biome check (lint + format)
-        run: npx biome check org.nan.usage/
+      - name: Run biome (lint + format)
+        run: npx biome ci .
 
-      - name: Run biome check (workspace)
-        run: npx biome check scripts/ package.json biome.json
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Run shellcheck
+        run: shellcheck install.sh scripts/*.sh
 
   qmllint:
     name: QML lint
@@ -100,13 +111,3 @@ jobs:
             $QMLLINT $OPTS "$f"
           done
 
-  qml-structure:
-    name: QML structure validation
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          persist-credentials: false
-
-      - name: Validate QML structure
-        run: node scripts/validate-qml.js
