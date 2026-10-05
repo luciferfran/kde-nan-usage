@@ -86,3 +86,42 @@ if (failed > 0) {
         console.error(`\n${f.name}:\n${f.error.stack || f.error.message}`)
     process.exit(1)
 }
+
+test("describeError handles additional status codes", () => {
+    assert.strictEqual(c.describeError({ status: 400 }), "Error HTTP 400")
+    assert.strictEqual(c.describeError({ status: 404 }), "Error HTTP 404")
+    assert.strictEqual(
+        c.describeError({ status: 500 }),
+        "NaN no responde (HTTP 500)"
+    )
+    assert.strictEqual(
+        c.describeError({ status: 502 }),
+        "NaN no responde (HTTP 502)"
+    )
+    assert.strictEqual(
+        c.describeError({ status: 504 }),
+        "NaN no responde (HTTP 504)"
+    )
+    assert.strictEqual(c.describeError({ status: 408 }), "Error HTTP 408")
+})
+
+test("describeError handles response body in errors", () => {
+    const err = {
+        status: 500,
+        kind: "http",
+        message: "HTTP 500",
+        body: '{"error":"internal server error","code":500}'
+    }
+    assert.strictEqual(c.describeError(err), "NaN no responde (HTTP 500)")
+    // Body is not included in user-facing text
+    assert.ok(!c.describeError(err).includes("internal"))
+})
+
+test("describeError handles unknown error objects", () => {
+    assert.strictEqual(c.describeError({ code: "ENETUNREACH" }), "Sin conexión")
+    assert.strictEqual(
+        c.describeError({ type: "NetworkError" }),
+        "Sin conexión"
+    )
+    assert.strictEqual(c.describeError({ error: "timeout" }), "Sin conexión")
+})
