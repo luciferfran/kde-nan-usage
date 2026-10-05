@@ -76,7 +76,7 @@ const VALIDATORS = {
 function validateResponse(path, data) {
     const validator = VALIDATORS[path]
     if (!validator) return true // No validator defined; trust the response
-    return validator(data)
+    return Boolean(validator(data))
 }
 
 // Build the shell command that prints the API key file. Home-relative paths use

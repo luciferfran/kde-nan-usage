@@ -1,26 +1,8 @@
-// Node test for the HTTP client helpers. Run with:
-//   node tests/nanClient.test.js
+// Node tests for the HTTP client helpers. Run with: npm test
 
 const assert = require("node:assert")
+const { test } = require("node:test")
 const c = require("../contents/code/nanClient.js")
-
-let passed = 0
-let failed = 0
-const failures = []
-
-function test(name, fn) {
-    try {
-        fn()
-        passed++
-        console.log(`  ok  ${name}`)
-    } catch (e) {
-        failed++
-        failures.push({ name, error: e })
-        console.error(`FAIL  ${name}\n      ${e.message}`)
-    }
-}
-
-console.log("nanClient")
 
 test("shellQuote wraps and escapes single quotes", () => {
     assert.strictEqual(c.shellQuote("abc"), "'abc'")
@@ -84,14 +66,6 @@ test("describeError reports a missing key with its path", () => {
     )
     assert.strictEqual(c.describeError(null), "Error desconocido")
 })
-
-console.log("")
-console.log(`${passed} passed, ${failed} failed`)
-if (failed > 0) {
-    for (const f of failures)
-        console.error(`\n${f.name}:\n${f.error.stack || f.error.message}`)
-    process.exit(1)
-}
 
 test("describeError handles additional status codes", () => {
     assert.strictEqual(c.describeError({ status: 400 }), "Error HTTP 400")
@@ -173,7 +147,7 @@ test("validateResponse checks API response structure", () => {
         c.validateResponse("/api/usage/quota", { models: [] }),
         false
     ) // no periodStart
-    assert.strictEqual(c.validateResponse("/api/usage/quota", null), null)
+    assert.strictEqual(c.validateResponse("/api/usage/quota", null), false)
     assert.strictEqual(c.validateResponse("/api/usage/quota", "string"), false)
     assert.strictEqual(c.validateResponse("/api/usage/quota", 42), false)
     assert.strictEqual(
@@ -194,14 +168,17 @@ test("validateResponse checks API response structure", () => {
         c.validateResponse("/api/auth/me", { name: "Test" }),
         true
     )
-    assert.strictEqual(c.validateResponse("/api/auth/me", null), null)
+    assert.strictEqual(c.validateResponse("/api/auth/me", null), false)
 
     // Valid metrics response
-    assert.ok(c.validateResponse("/api/metrics/usage", { last24h: {} }))
+    assert.strictEqual(
+        c.validateResponse("/api/metrics/usage", { last24h: {} }),
+        true
+    )
     assert.ok(c.validateResponse("/api/metrics/usage", { monthToDate: {} }))
     assert.ok(c.validateResponse("/api/metrics/usage", { last30d: {} }))
-    assert.strictEqual(c.validateResponse("/api/metrics/usage", {}), undefined)
-    assert.strictEqual(c.validateResponse("/api/metrics/usage", null), null)
+    assert.strictEqual(c.validateResponse("/api/metrics/usage", {}), false)
+    assert.strictEqual(c.validateResponse("/api/metrics/usage", null), false)
 
     // No validator for unknown paths — trust them
     assert.strictEqual(
@@ -218,4 +195,141 @@ test("keyCommand throws on invalid paths", () => {
     assert.doesNotThrow(() => c.keyCommand("~/.config/nan/api-key"))
     assert.doesNotThrow(() => c.keyCommand(""))
     assert.doesNotThrow(() => c.keyCommand("~"))
+})
+
+// --- request() with a fake XMLHttpRequest ---
+
+// Minimal stand-in for QML's XMLHttpRequest. `respond` decides what happens
+// on send(): a {status, body} response, or "error" / "timeout".
+function installFakeXhr(respond) {
+    const sent = []
+    class FakeXhr {
+        static DONE = 4
+        constructor() {
+            this.headers = {}
+            this.readyState = 0
+            this.status = 0
+            this.responseText = ""
+        }
+        open(method, url) {
+            this.method = method
+            this.url = url
+        }
+        setRequestHeader(name, value) {
+            this.headers[name] = value
+        }
+        send() {
+            sent.push(this)
+            const r = respond(this)
+            if (r === "error") return this.onerror()
+            if (r === "timeout") return this.ontimeout()
+            this.status = r.status
+            this.responseText = r.body
+            this.readyState = FakeXhr.DONE
+            this.onreadystatechange()
+        }
+    }
+    global.XMLHttpRequest = FakeXhr
+    return sent
+}
+
+// Runs request() and records every callback invocation.
+function runRequest(path, respond, timeoutMs) {
+    const sent = installFakeXhr(respond)
+    const calls = []
+    c.request(
+        path,
+        "secret",
+        (body) => calls.push(["ok", body]),
+        (err) => calls.push(["err", err]),
+        timeoutMs
+    )
+    delete global.XMLHttpRequest
+    return { xhr: sent[0], calls }
+}
+
+const QUOTA = { periodStart: "2026-09-01T00:00:00Z", models: [] }
+
+test("request sends the key and parses a valid response", () => {
+    const { xhr, calls } = runRequest("/api/usage/quota", () => ({
+        status: 200,
+        body: JSON.stringify(QUOTA)
+    }))
+    assert.strictEqual(xhr.method, "GET")
+    assert.strictEqual(xhr.url, `${c.CLOUD_API}/api/usage/quota`)
+    assert.strictEqual(xhr.headers.Authorization, "Bearer secret")
+    assert.strictEqual(xhr.timeout, 15000)
+    assert.deepStrictEqual(calls, [["ok", QUOTA]])
+})
+
+test("request honours a custom timeout", () => {
+    const { xhr } = runRequest(
+        "/api/usage/quota",
+        () => ({ status: 200, body: JSON.stringify(QUOTA) }),
+        5000
+    )
+    assert.strictEqual(xhr.timeout, 5000)
+})
+
+test("request reports invalid JSON as a parse error", () => {
+    const { calls } = runRequest("/api/usage/quota", () => ({
+        status: 200,
+        body: "<html>"
+    }))
+    assert.strictEqual(calls.length, 1)
+    assert.strictEqual(calls[0][0], "err")
+    assert.strictEqual(calls[0][1].kind, "parse")
+})
+
+test("request rejects a response with an unexpected shape", () => {
+    const { calls } = runRequest("/api/usage/quota", () => ({
+        status: 200,
+        body: JSON.stringify({ hello: "world" })
+    }))
+    assert.strictEqual(calls.length, 1)
+    assert.strictEqual(calls[0][1].kind, "parse")
+})
+
+test("request reports HTTP errors without leaking the key", () => {
+    for (const status of [401, 500]) {
+        const { calls } = runRequest("/api/usage/quota", () => ({
+            status,
+            body: "nope"
+        }))
+        assert.strictEqual(calls.length, 1)
+        const err = calls[0][1]
+        assert.strictEqual(err.kind, "http")
+        assert.strictEqual(err.status, status)
+        assert.ok(!JSON.stringify(err).includes("secret"))
+    }
+})
+
+test("request reports network errors and timeouts once", () => {
+    for (const [mode, kind] of [
+        ["error", "network"],
+        ["timeout", "timeout"]
+    ]) {
+        const { calls } = runRequest("/api/usage/quota", () => mode)
+        assert.strictEqual(calls.length, 1)
+        assert.strictEqual(calls[0][1].kind, kind)
+    }
+})
+
+test("request calls back only once even if events repeat", () => {
+    const sent = installFakeXhr(() => ({
+        status: 200,
+        body: JSON.stringify(QUOTA)
+    }))
+    let count = 0
+    c.request(
+        "/api/usage/quota",
+        "k",
+        () => count++,
+        () => count++
+    )
+    sent[0].onerror()
+    sent[0].ontimeout()
+    sent[0].onreadystatechange()
+    delete global.XMLHttpRequest
+    assert.strictEqual(count, 1)
 })

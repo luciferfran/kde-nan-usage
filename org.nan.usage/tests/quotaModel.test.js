@@ -1,23 +1,8 @@
-// Node test for the pure quota model. Run with: node tests/quotaModel.test.js
+// Node tests for the pure quota model. Run with: npm test
 
 const assert = require("node:assert")
+const { test } = require("node:test")
 const m = require("../contents/code/quotaModel.js")
-
-let passed = 0
-let failed = 0
-const failures = []
-
-function test(name, fn) {
-    try {
-        fn()
-        passed++
-        console.log(`  ok  ${name}`)
-    } catch (e) {
-        failed++
-        failures.push({ name, error: e })
-        console.error(`FAIL  ${name}\n      ${e.message}`)
-    }
-}
 
 const DAY = 24 * 3600 * 1000
 const SEP1 = Date.parse("2026-09-01T00:00:00Z")
@@ -34,8 +19,6 @@ function windowAt(util, startMs, endMs) {
         resetsAt: endMs
     }
 }
-
-console.log("quotaModel")
 
 test("fmtTokens formats compact token counts", () => {
     assert.strictEqual(m.fmtTokens(0), "0")
@@ -54,8 +37,8 @@ test("fmtTokens formats compact token counts", () => {
 test("fmtTokens handles NaN, Infinity, and float edge cases", () => {
     // NaN → 0 (via || 0)
     assert.strictEqual(m.fmtTokens(NaN), "0")
-    // Infinity → "InfinityB" (the formatting path, no special handling)
-    assert.strictEqual(m.fmtTokens(Infinity), "InfinityB")
+    // Non-finite values → 0
+    assert.strictEqual(m.fmtTokens(Infinity), "0")
     assert.strictEqual(m.fmtTokens(-Infinity), "0")
     // Float precision
     assert.strictEqual(m.fmtTokens(0.5), "1")
@@ -433,7 +416,7 @@ test("selectPanelWindow handles single window and ties", () => {
         "test-model"
     )
 
-    // Tie in utilization - reduce picks first on equal
+    // Tie in utilization: reduce keeps the first one
     const tied = [
         {
             model: "a",
@@ -451,7 +434,7 @@ test("selectPanelWindow handles single window and ties", () => {
         }
     ]
     const result = m.selectPanelWindow(tied, "max", null, SEP15)
-    assert.ok(result.model === "a" || result.model === "b")
+    assert.strictEqual(result.model, "a")
 })
 
 test("metricsSummary builds the aggregated line", () => {
@@ -489,11 +472,3 @@ test("metricsSummary handles partial and zero data", () => {
         "24 h: 1000B · 30 d: 1B"
     )
 })
-
-console.log("")
-console.log(`${passed} passed, ${failed} failed`)
-if (failed > 0) {
-    for (const f of failures)
-        console.error(`\n${f.name}:\n${f.error.stack || f.error.message}`)
-    process.exit(1)
-}

@@ -31,7 +31,8 @@ function parseDate(v) {
 
 // Compact token format: 3B, 1,5B, 79,9M, 500M, 398K, 42.
 function fmtTokens(n) {
-    const v = Math.max(0, Number(n) || 0)
+    const num = Number(n)
+    const v = Number.isFinite(num) ? Math.max(0, num) : 0
     const trim = (s) =>
         s.replace(/0+$/, "").replace(/\.$/, "").replace(".", ",")
     if (v >= 1e9) return `${trim((v / 1e9).toFixed(2))}B`
