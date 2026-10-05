@@ -3,6 +3,32 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/);
 versionado [SemVer](https://semver.org/lang/es/).
 
+## [No publicado]
+
+### Fijo
+
+- Tests: `nanClient.test.js` salía con código 0 aunque fallaran los tests
+  declarados tras el resumen. Migrados ambos archivos a `node:test`.
+- `hideUnused` no tenía efecto: el popup ahora usa `visibleWindows()`.
+- Ajustes: los desplegables «Modelo del panel» e «Indicador del panel» no
+  mostraban el valor guardado al reabrir el diálogo.
+- Una ruta de API key inválida dejaba el widget colgado sin mensaje; ahora
+  muestra «Ruta de API key no válida».
+- `install.sh` no llamaba a la verificación de permisos de la key; ahora usa
+  `scripts/check-key-perms.sh`, que no pregunta si no hay terminal.
+- «Actualizar ahora» vuelve a esperar como máximo 30 s (podía esperar el
+  intervalo de sondeo completo).
+- `validateResponse` devuelve siempre un booleano; `fmtTokens` muestra `0`
+  para valores no finitos.
+
+### Cambiado
+
+- Tests de `request()` con un `XMLHttpRequest` simulado.
+- `npm run check` agrupa lint, tests y validación QML; `lint:fix` usa
+  `--write` (Biome 2); Biome fijado a 2.5.15.
+- CI: Node 22, `biome ci .`, job de ShellCheck y validación QML dentro del
+  job de tests.
+
 ## [0.2.0] - 2026-09-11
 
 Mejoras de calidad: seguridad, error handling, CI/CD, tests y modernización JS.

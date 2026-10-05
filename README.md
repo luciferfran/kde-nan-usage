@@ -123,7 +123,7 @@ Desde ⚙ en el popup o en la configuración del widget:
 
 | clave | qué hace | por defecto |
 | --- | --- | --- |
-| `keyPath` | fichero con la API key (`~` vale) | `~/.config/nan/api-key` |
+| `keyPath` | fichero con la API key; ruta bajo `~/` o relativa (no se aceptan rutas absolutas ni `..`) | `~/.config/nan/api-key` |
 | `pollSeconds` | segundos entre sondeos (60 a 1800) | `300` |
 | `panelModel` | qué modelo refleja el panel: `worst` (nivel y luego uso), `max` (mayor uso), `fixed` | `worst` |
 | `panelModelId` | modelo para `fixed` | `deepseek-v4-flash` |
@@ -159,7 +159,8 @@ público**: pueden cambiar sin aviso.
 ## Desarrollo y pruebas
 
 ```sh
-node org.nan.usage/tests/quotaModel.test.js   # lógica pura con datos sintéticos y reloj fijo
+npm ci          # instala Biome
+npm run check   # Biome (lint + formato), tests (node --test) y validación de estructura QML
 /usr/lib/qt6/bin/qmllint -I /usr/lib/qt6/qml org.nan.usage/contents/ui/*.qml
 ```
 
