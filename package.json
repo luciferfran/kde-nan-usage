@@ -1,13 +1,13 @@
 {
-  "name": "kde-nan-usage",
-  "private": true,
-  "scripts": {
-    "lint": "biome check .",
-    "lint:fix": "biome check --apply .",
-    "format": "biome format --write .",
-    "test": "node org.nan.usage/tests/quotaModel.test.js && node org.nan.usage/tests/nanClient.test.js"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "^2.0.0"
-  }
+    "name": "kde-nan-usage",
+    "private": true,
+    "scripts": {
+        "lint": "biome check .",
+        "lint:fix": "biome check --apply .",
+        "format": "biome format --write .",
+        "test": "node org.nan.usage/tests/quotaModel.test.js && node org.nan.usage/tests/nanClient.test.js"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "^2.0.0"
+    }
 }
