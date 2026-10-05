@@ -19,25 +19,6 @@ install_icon() {
     echo "Icono instalado en $icon_target"
 }
 
-check_key_perms() {
-    local KEY="$HOME/.config/nan/api-key"
-    if [ ! -f "$KEY" ]; then
-        return
-    fi
-    local PERMS
-    PERMS=$(stat -c '%a' "$KEY" 2>/dev/null || stat -f '%Lp' "$KEY" 2>/dev/null || echo "unknown")
-    if [ "$PERMS" != "600" ] && [ "$PERMS" != "400" ]; then
-        printf "\033[1;33mAdvertencia: fichero de API key tiene permisos inseguros (mode %s, debería ser 600 o 400)\033[0m\n" "$PERMS"
-        printf "Fijar ahora? [y/N] "
-        read -r RESP
-        if [[ "$RESP" =~ ^[Yy] ]]; then
-            chmod 600 "$KEY" && printf "\033[1;32mPermisos fijados\033[0m\n" || printf "\033[1;31mError al fijar permisos\033[0m\n"
-        else
-            printf "Fijar manualmente: chmod 600 %s\n" "$KEY"
-        fi
-    fi
-}
-
 case "${1:-install}" in
 install)
     mkdir -p "$(dirname "$target")"
@@ -45,6 +26,7 @@ install)
     ln -s "$package" "$target"
     install_icon
     echo "Enlazado $target -> $package"
+    "$here/scripts/check-key-perms.sh" || true
     ;;
 copy)
     mkdir -p "$(dirname "$target")"
@@ -52,6 +34,7 @@ copy)
     cp -r "$package" "$target"
     install_icon
     echo "Copiado a $target"
+    "$here/scripts/check-key-perms.sh" || true
     ;;
 uninstall)
     rm -rf "$target"

@@ -18,7 +18,7 @@ if [ ! -f "$KEY_PATH" ]; then
     exit 1
 fi
 
-PERMS=$(stat -c '%a' "$KEY_PATH" 2>/dev/null || stat -f '%Lp' "$KEY_PATH" 2>/dev/null)
+PERMS=$(stat -c '%a' "$KEY_PATH" 2>/dev/null || stat -f '%Lp' "$KEY_PATH" 2>/dev/null || echo "unknown")
 
 if [ "$PERMS" = "600" ] || [ "$PERMS" = "400" ]; then
     printf '\033[1;32m✓\033[0m Key file %s has secure permissions (mode %s)\n' "$KEY_PATH" "$PERMS"
@@ -29,9 +29,9 @@ printf '\033[1;31m✗ Insecure permissions\033[0m on %s (mode %s, should be 600 
 printf 'Fix with:\n'
 printf '    chmod 600 %s\n\n' "$KEY_PATH"
 
-# If running in CI, exit non-fatal
-if [ -n "${CI:-}" ]; then
-    printf '\033[1;33mℹ CI mode: exiting cleanly (not blocking)\033[0m\n'
+# Without a terminal (CI, piped installs) there is nobody to answer the prompt.
+if [ -n "${CI:-}" ] || [ ! -t 0 ]; then
+    printf '\033[1;33mℹ Non-interactive: not changing permissions\033[0m\n'
     exit 0
 fi
 

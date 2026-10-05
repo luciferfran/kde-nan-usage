@@ -48,7 +48,7 @@ cp "$src/contents/icons/nan.svg" "$icon_target"
 
 KEY="$HOME/.config/nan/api-key"
 if [ ! -s "$KEY" ]; then
-    msg "Aún falta tu API key. Ponla así (queda solo para tu usuario):"
+    msg "Aún falta tu API key. Ponela así (queda solo para tu usuario):"
     printf "    mkdir -p ~/.config/nan && (umask 177; printf %%s 'TU_API_KEY' > ~/.config/nan/api-key)\n"
 fi
 
