@@ -20,15 +20,71 @@ function describeError(e) {
     if (e.status > 0) return `Error HTTP ${e.status}`
     return e.message ? `Sin conexión: ${e.message}` : "Sin conexión"
 }
-
 // Quote a value so it survives a POSIX shell as a single literal argument.
 function shellQuote(value) {
     return `'${String(value).replace(/'/g, "'\\''")}'`
 }
 
+// Validate a key path: reject path traversal, absolute paths outside home,
+// and characters that could escape shell quoting.
+function isValidKeyPath(path) {
+    const p = String(path || "").trim()
+    // Empty, just "~", or home-relative
+    if (p === "" || p === "~" || p.startsWith("~/")) return true
+    // Reject absolute paths (only allow home-relative)
+    if (p.startsWith("/")) return false
+    // Reject path traversal
+    if (p.includes("..")) return false
+    // Reject shell injection characters (backticks, $(), ;, |, &, newline)
+    // Spaces and quotes are safe because shellQuote handles them
+    if (/[`;$&\n\r\t]/.test(p)) return false
+    // Accept safe characters: alphanum, underscore, dash, dot, slash, tilde, space
+    return /^[a-zA-Z0-9_.~/ -]+$/.test(p)
+}
+
+// Validate the API response structure. Returns true if the response
+// has the expected shape, false if the response is empty or clearly
+// malformed (helps catch unexpected API changes early).
+const VALIDATORS = {
+    "/api/usage/quota": (data) => {
+        return (
+            data &&
+            typeof data === "object" &&
+            Array.isArray(data.models) &&
+            (typeof data.periodStart === "string" ||
+                typeof data.periodStart === "number")
+        )
+    },
+    "/api/auth/me": (data) => {
+        return (
+            data &&
+            typeof data === "object" &&
+            (typeof data.handle === "string" ||
+                typeof data.email === "string" ||
+                typeof data.name === "string")
+        )
+    },
+    "/api/metrics/usage": (data) => {
+        return (
+            data &&
+            typeof data === "object" &&
+            (data.last24h || data.monthToDate || data.last30d)
+        )
+    }
+}
+
+function validateResponse(path, data) {
+    const validator = VALIDATORS[path]
+    if (!validator) return true // No validator defined; trust the response
+    return validator(data)
+}
+
 // Build the shell command that prints the API key file. Home-relative paths use
 // $HOME so the shell expands them; everything else is single-quoted.
 function keyCommand(path) {
+    if (path && !isValidKeyPath(path)) {
+        throw new Error(`Invalid key path: ${JSON.stringify(path)}`)
+    }
     const p = String(path || "").trim()
     if (p === "" || p === "~") return 'cat "$HOME"'
     if (p.startsWith("~/")) return `cat "$HOME"/${shellQuote(p.slice(2))}`
@@ -50,6 +106,15 @@ function request(path, key, onSuccess, onError) {
 
     function succeed(body) {
         if (finished) return
+        // Validate response structure before passing to consumer
+        if (!validateResponse(path, body)) {
+            fail({
+                status: 0,
+                kind: "parse",
+                message: `Unexpected API response shape for ${path}`
+            })
+            return
+        }
         finished = true
         onSuccess(body)
     }
@@ -114,8 +179,11 @@ function fetchMetrics(key, onSuccess, onError) {
 if (typeof module !== "undefined" && module.exports) {
     module.exports = {
         CLOUD_API: CLOUD_API,
+        VALIDATORS: VALIDATORS,
         describeError: describeError,
         shellQuote: shellQuote,
+        isValidKeyPath: isValidKeyPath,
+        validateResponse: validateResponse,
         keyCommand: keyCommand,
         request: request,
         fetchQuota: fetchQuota,

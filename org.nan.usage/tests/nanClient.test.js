@@ -37,9 +37,15 @@ test("keyCommand expands home-relative paths", () => {
     )
 })
 
-test("keyCommand quotes absolute paths with spaces and quotes", () => {
-    assert.strictEqual(c.keyCommand("/tmp/my key"), "cat '/tmp/my key'")
-    assert.strictEqual(c.keyCommand("/tmp/it's"), "cat '/tmp/it'\\''s'")
+test("keyCommand shell-quotes home-relative paths with spaces and quotes", () => {
+    assert.strictEqual(
+        c.keyCommand("~/my config/api-key"),
+        "cat \"$HOME\"/'my config/api-key'"
+    )
+    assert.strictEqual(
+        c.keyCommand("~/it's key"),
+        "cat \"$HOME\"/'it'\\''s key'"
+    )
 })
 
 test("describeError maps the API status codes", () => {
@@ -124,4 +130,92 @@ test("describeError handles unknown error objects", () => {
         "Sin conexión"
     )
     assert.strictEqual(c.describeError({ error: "timeout" }), "Sin conexión")
+})
+
+// --- Security tests ---
+test("isValidKeyPath blocks path traversal and shell injection", () => {
+    assert.strictEqual(c.isValidKeyPath(""), true)
+    assert.strictEqual(c.isValidKeyPath("~"), true)
+    assert.strictEqual(c.isValidKeyPath("~/.config/nan/api-key"), true)
+    assert.strictEqual(c.isValidKeyPath("./nan/api-key"), true) // relative, no injection chars
+    assert.strictEqual(c.isValidKeyPath("/etc/shadow"), false) // absolute
+    assert.strictEqual(c.isValidKeyPath("/root/.ssh/id_rsa"), false) // absolute
+    assert.strictEqual(c.isValidKeyPath("../../../etc/passwd"), false) // traversal
+    assert.strictEqual(c.isValidKeyPath("dir/../secret"), false) // traversal
+    assert.strictEqual(c.isValidKeyPath("key; rm -rf /"), false) // shell injection
+    assert.strictEqual(c.isValidKeyPath("key`whoami`"), false) // backtick injection
+    assert.strictEqual(c.isValidKeyPath("key$(id)"), false) // subshell injection
+    assert.strictEqual(c.isValidKeyPath("key|cat /etc/passwd"), false) // pipe injection
+    assert.strictEqual(c.isValidKeyPath("key&&cat /etc/passwd"), false) // && injection
+    assert.strictEqual(c.isValidKeyPath("key\nid"), false) // newline injection
+    assert.strictEqual(c.isValidKeyPath("api-key.txt"), true) // valid filename
+})
+
+test("isValidKeyPath accepts valid key paths", () => {
+    assert.strictEqual(c.isValidKeyPath("api-key"), true) // valid filename, shellQuote handles it
+    assert.strictEqual(c.isValidKeyPath("~/.config/nan/api-key"), true)
+    assert.strictEqual(c.isValidKeyPath("~/.config/nan.api-key"), true)
+    assert.strictEqual(c.isValidKeyPath("~/.config/nan/api_key"), true)
+    assert.strictEqual(c.isValidKeyPath("~/.config/nan/api-key.backup"), true)
+})
+
+test("validateResponse checks API response structure", () => {
+    // Valid quota response
+    assert.strictEqual(
+        c.validateResponse("/api/usage/quota", {
+            periodStart: "2026-01-01",
+            models: [{ model: "x", tokensUsed: 10, cap: 100 }]
+        }),
+        true
+    )
+    assert.strictEqual(c.validateResponse("/api/usage/quota", {}), false)
+    assert.strictEqual(
+        c.validateResponse("/api/usage/quota", { models: [] }),
+        false
+    ) // no periodStart
+    assert.strictEqual(c.validateResponse("/api/usage/quota", null), null)
+    assert.strictEqual(c.validateResponse("/api/usage/quota", "string"), false)
+    assert.strictEqual(c.validateResponse("/api/usage/quota", 42), false)
+    assert.strictEqual(
+        c.validateResponse("/api/usage/quota", { periodStart: 123 }),
+        false
+    ) // no models array
+
+    // Valid me response
+    assert.strictEqual(
+        c.validateResponse("/api/auth/me", { handle: "test" }),
+        true
+    )
+    assert.strictEqual(
+        c.validateResponse("/api/auth/me", { email: "test@test.com" }),
+        true
+    )
+    assert.strictEqual(
+        c.validateResponse("/api/auth/me", { name: "Test" }),
+        true
+    )
+    assert.strictEqual(c.validateResponse("/api/auth/me", null), null)
+
+    // Valid metrics response
+    assert.ok(c.validateResponse("/api/metrics/usage", { last24h: {} }))
+    assert.ok(c.validateResponse("/api/metrics/usage", { monthToDate: {} }))
+    assert.ok(c.validateResponse("/api/metrics/usage", { last30d: {} }))
+    assert.strictEqual(c.validateResponse("/api/metrics/usage", {}), undefined)
+    assert.strictEqual(c.validateResponse("/api/metrics/usage", null), null)
+
+    // No validator for unknown paths — trust them
+    assert.strictEqual(
+        c.validateResponse("/api/unknown", { anything: true }),
+        true
+    )
+})
+
+test("keyCommand throws on invalid paths", () => {
+    assert.throws(() => c.keyCommand("../../../etc/passwd"), /Invalid key path/)
+    assert.throws(() => c.keyCommand("/etc/shadow"), /Invalid key path/)
+    assert.throws(() => c.keyCommand("key; rm -rf /"), /Invalid key path/)
+    // Safe paths should not throw
+    assert.doesNotThrow(() => c.keyCommand("~/.config/nan/api-key"))
+    assert.doesNotThrow(() => c.keyCommand(""))
+    assert.doesNotThrow(() => c.keyCommand("~"))
 })
