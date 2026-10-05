@@ -149,7 +149,7 @@ PlasmoidItem {
         root.refreshing = true;
 
         NanClient.fetchQuota(root.apiKey, function (quota) {
-            root.windows = QuotaModel.normalizeQuota(quota, Date.now());
+            root.windows = QuotaModel.normalizeQuota(quota);
             root.apiErrorMessage = "";
             root.stale = false;
             root.refreshing = false;
