@@ -47,10 +47,10 @@ jobs:
         run: npm ci
 
       - name: Run biome check (lint + format)
-        run: npx biome check --write org.nan.usage/
+        run: npx biome check org.nan.usage/
 
-      - name: Verify no changes needed
-        run: git diff --exit-code --stat || (echo "Changes detected — run \`npm run lint\` and \`npm run format\` locally" && exit 1)
+      - name: Run biome check (workspace)
+        run: npx biome check scripts/ package.json biome.json
 
   qmllint:
     name: QML lint
@@ -85,12 +85,17 @@ jobs:
           OPTS="--alias disable --compiler disable --controls-sanity disable"
           OPTS="$OPTS --deferred-property-id disable --deprecated disable"
           OPTS="$OPTS --import disable --inheritance-cycle disable"
-          OPTS="$OPTS --multiline-strings disable --multiple-attached-objects disable"
+          OPTS="$OPTS --multiline-strings disable"
+          OPTS="$OPTS --multiple-attached-objects disable"
           OPTS="$OPTS --plugin disable --property disable --required disable"
           OPTS="$OPTS --signal disable --type disable --unqualified disable"
           OPTS="$OPTS --unused-imports disable --with disable"
 
-          for f in $(find org.nan.usage/contents -type f \( -name '*.qml' -o -name '*.js' \)); do
+          for f in $(
+            find org.nan.usage/contents -type f \
+              \( -name '*.qml' -o -name '*.js' \)
+          ); do
+
             echo "== $f"
             $QMLLINT $OPTS "$f"
           done
