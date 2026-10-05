@@ -6,16 +6,15 @@ import QtQuick.Layouts
 
 import org.kde.kcmutils as KCM
 import org.kde.kirigami as Kirigami
-import org.kde.plasma.core as PlasmaCore
 
 KCM.SimpleKCM {
     id: root
 
     property alias cfg_keyPath: keyPathField.text
     property alias cfg_pollSeconds: pollSecondsSpin.value
-    property alias cfg_panelModel: panelModelCombo.currentValue
+    property string cfg_panelModel
     property alias cfg_panelModelId: panelModelIdField.text
-    property alias cfg_panelGauge: panelGaugeCombo.currentValue
+    property string cfg_panelGauge
     property alias cfg_showIcon: showIconCheck.checked
     property alias cfg_showPercentage: showPercentageCheck.checked
     property alias cfg_showReset: showResetCheck.checked
@@ -48,6 +47,8 @@ KCM.SimpleKCM {
                 {text: i18n("Mayor uso"), value: "max"},
                 {text: i18n("Fijo"), value: "fixed"},
             ]
+            onActivated: root.cfg_panelModel = currentValue
+            Component.onCompleted: currentIndex = indexOfValue(root.cfg_panelModel)
         }
 
         QQC2.TextField {
@@ -67,6 +68,8 @@ KCM.SimpleKCM {
                 {text: i18n("Barra"), value: "bar"},
                 {text: i18n("Ninguno"), value: "none"},
             ]
+            onActivated: root.cfg_panelGauge = currentValue
+            Component.onCompleted: currentIndex = indexOfValue(root.cfg_panelGauge)
         }
 
         Item {

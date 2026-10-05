@@ -26,6 +26,8 @@ PlasmoidItem {
     property bool keyReadPending: false
     property double lastSuccessMs: 0
     property double lastRequestMs: 0
+    // Minimum gap between forced refreshes, so the button cannot hammer the API.
+    readonly property int manualCooldownMs: 30000
 
     // Ticks so time-based bindings refresh without a network request.
     property double nowMs: Date.now()
@@ -79,12 +81,6 @@ PlasmoidItem {
     readonly property string resetText: root.resetMs > 0
         ? QuotaModel.humanDuration(root.resetMs, true)
         : ""
-    // Short label used in fullRepresentation error display.
-    readonly property string errorLabel: {
-        if (root.uiState === "api-error")
-            return root.apiErrorMessage
-        return ""
-    }
     // Localized error text used in tooltips.
     readonly property string errorText: root.uiState === "no-api-key"
         ? i18n("No se encontró la API key en %1", root.cfgKeyPath)
@@ -128,7 +124,7 @@ PlasmoidItem {
             keySource.disconnectSource(sourceName);
             root.keyReading = false;
 
-            var key = String(data.stdout || "").trim();
+            const key = String(data.stdout || "").trim();
             if (key.length === 0) {
                 root.apiKey = "";
                 root.apiErrorMessage = "nokey";
@@ -153,8 +149,17 @@ PlasmoidItem {
             root.keyReadPending = true;
             return;
         }
+        let command;
+        try {
+            command = NanClient.keyCommand(root.cfgKeyPath);
+        } catch (e) {
+            root.apiKey = "";
+            root.apiErrorMessage = i18n("Ruta de API key no válida: %1", root.cfgKeyPath);
+            root.stale = root.windows.length > 0;
+            return;
+        }
         root.keyReading = true;
-        keySource.connectSource(NanClient.keyCommand(root.cfgKeyPath));
+        keySource.connectSource(command);
     }
 
     // --- Network ---
@@ -164,11 +169,14 @@ PlasmoidItem {
             return;
         }
 
-        var now = Date.now();
-        var elapsed = now - root.lastRequestMs;
-        if (elapsed < pollTimer.interval) {
+        // Forced refreshes (manual button, new key) only wait a short cooldown;
+        // scheduled polls keep the full interval.
+        const now = Date.now();
+        const elapsed = now - root.lastRequestMs;
+        const minGap = force ? root.manualCooldownMs : pollTimer.interval;
+        if (elapsed < minGap) {
             if (force) {
-                cooldownTimer.interval = pollTimer.interval - elapsed;
+                cooldownTimer.interval = minGap - elapsed;
                 cooldownTimer.restart();
             }
             return;
@@ -246,7 +254,10 @@ PlasmoidItem {
     }
 
     fullRepresentation: FullRepresentation {
-        windows: root.windows
+        windows: QuotaModel.visibleWindows(root.windows, {
+            hideUnused: Plasmoid.configuration.hideUnused,
+            pinned: root.panelWindow ? root.panelWindow.model : null
+        })
         metrics: root.metrics
         account: root.account
         errorText: root.errorText

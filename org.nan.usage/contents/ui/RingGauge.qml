@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 
 import org.kde.kirigami as Kirigami
@@ -31,18 +33,18 @@ Item {
         antialiasing: true
 
         onPaint: {
-            var ctx = getContext("2d");
+            const ctx = getContext("2d");
             ctx.reset();
 
-            var size = Math.min(width, height);
-            var cx = width / 2;
-            var cy = height / 2;
-            var radius = Math.max(0, (size - gauge.lineWidth) / 2);
+            const size = Math.min(width, height);
+            const cx = width / 2;
+            const cy = height / 2;
+            const radius = Math.max(0, (size - gauge.lineWidth) / 2);
             if (radius <= 0)
                 return;
 
-            var start = -Math.PI / 2;
-            var full = Math.PI * 2;
+            const start = -Math.PI / 2;
+            const full = Math.PI * 2;
 
             // Background track.
             ctx.beginPath();
@@ -52,7 +54,7 @@ Item {
             ctx.stroke();
 
             // Value arc. Clamp so an overshoot does not wrap around.
-            var fraction = Math.max(0, Math.min(1, gauge.value / 100));
+            const fraction = Math.max(0, Math.min(1, gauge.value / 100));
             if (fraction > 0) {
                 ctx.beginPath();
                 ctx.arc(cx, cy, radius, start, start + full * fraction);
