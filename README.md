@@ -131,7 +131,7 @@ Desde ⚙ en el popup o en la configuración del widget:
 | `showIcon` | mostrar el icono | sí |
 | `showPercentage` | mostrar el porcentaje | sí |
 | `showReset` | mostrar el tiempo hasta el reset | sí |
-| `hideUnused` | ocultar en el popup los modelos con cero uso | sí |
+| `hideUnused` | ocultar en el popup los modelos con cero uso (el modelo del panel se muestra siempre) | sí |
 | `showMetrics` | línea de consumo 24 h / mes / 30 d (una petición más) | sí |
 
 ## Cómo funciona

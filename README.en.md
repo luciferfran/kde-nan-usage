@@ -133,7 +133,7 @@ From ⚙ in the popup or in the widget configuration:
 | `showIcon` | show the icon | yes |
 | `showPercentage` | show the utilization percentage | yes |
 | `showReset` | show time until reset | yes |
-| `hideUnused` | hide zero-usage models in the popup | yes |
+| `hideUnused` | hide zero-usage models in the popup (the panel model is always shown) | yes |
 | `showMetrics` | 24 h / month / 30 d consumption line (one extra request) | yes |
 
 ## How it works
