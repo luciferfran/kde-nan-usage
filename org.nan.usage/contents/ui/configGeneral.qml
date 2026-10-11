@@ -19,7 +19,6 @@ KCM.SimpleKCM {
     property alias cfg_showPercentage: showPercentageCheck.checked
     property alias cfg_showReset: showResetCheck.checked
     property alias cfg_hideUnused: hideUnusedCheck.checked
-    property alias cfg_showMetrics: showMetricsCheck.checked
 
     Kirigami.FormLayout {
         QQC2.TextField {
@@ -100,11 +99,6 @@ KCM.SimpleKCM {
         QQC2.CheckBox {
             id: hideUnusedCheck
             text: i18n("Ocultar modelos sin uso")
-        }
-
-        QQC2.CheckBox {
-            id: showMetricsCheck
-            text: i18n("Mostrar consumo agregado (24 h, mes, 30 días)")
         }
     }
 }

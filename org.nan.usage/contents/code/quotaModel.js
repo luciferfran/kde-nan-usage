@@ -214,16 +214,15 @@ function selectPanelWindow(windows, mode, modelId, now) {
     return pool.reduce((best, w) => (score(w) > score(best) ? w : best))
 }
 
-// Aggregated usage line from GET /api/metrics/usage.
-function metricsSummary(metrics) {
-    if (!metrics) return ""
-    const total = (b) =>
-        fmtTokens(b && b.totalTokens != null ? b.totalTokens : 0)
-    const parts = []
-    if (metrics.last24h) parts.push(`24 h: ${total(metrics.last24h)}`)
-    if (metrics.monthToDate) parts.push(`mes: ${total(metrics.monthToDate)}`)
-    if (metrics.last30d) parts.push(`30 d: ${total(metrics.last30d)}`)
-    return parts.join(" · ")
+// Aggregated usage line for the popup, derived from the normalized quota
+// windows (sum of tokens used in the current plan period). Replaces the old
+// /api/metrics/usage call, which now requires a browser session.
+function usageLine(windows) {
+    if (!windows || !windows.length) return ""
+    let total = 0
+    for (let i = 0; i < windows.length; i++)
+        total += Math.max(0, Number(windows[i]?.used) || 0)
+    return `mes: ${fmtTokens(total)}`
 }
 
 if (typeof module !== "undefined" && module.exports) {
@@ -243,6 +242,6 @@ if (typeof module !== "undefined" && module.exports) {
         projectionNote: projectionNote,
         visibleWindows: visibleWindows,
         selectPanelWindow: selectPanelWindow,
-        metricsSummary: metricsSummary
+        usageLine: usageLine
     }
 }

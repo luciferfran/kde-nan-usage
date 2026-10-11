@@ -6,7 +6,7 @@ inspired by
 
 Shows on the panel the percentage of the model that is closest to its limit, the
 days until reset, and on click a popup with a bar per model, the consumption rate
-projection, and aggregated usage for the last 24 h, the month, and 30 days.
+projection, and the month total.
 
 New to NaN? Use [this referral link](https://cloud.nan.builders/r/BM7BJE4M) to
 sign up.
@@ -43,8 +43,7 @@ sign up.
 - **Consequence-based alerts, not just percentage**: amber if the average rate
   projects ≥ 75 % by reset; red if at that rate the quota runs out before the
   reset, leaving you blocked for a while.
-- **Aggregated consumption** for 24 h, month, and 30 days (optional, one extra
-  request).
+- **Month total** derived from the quota response itself, no extra request.
 - **No OAuth**: reads the API key from the same file used by the `nan` CLI.
 - **Polite with the API**: if NaN fails and there was data already, it keeps it
   and says so; between polls it recalculates "resets in …" without touching the
@@ -134,7 +133,6 @@ From ⚙ in the popup or in the widget configuration:
 | `showPercentage` | show the utilization percentage | yes |
 | `showReset` | show time until reset | yes |
 | `hideUnused` | hide zero-usage models in the popup (the panel model is always shown) | yes |
-| `showMetrics` | 24 h / month / 30 d consumption line (one extra request) | yes |
 
 ## How it works
 
@@ -145,9 +143,11 @@ contract**: they may change without notice.
 
 | route | use here |
 | --- | --- |
-| `GET /api/usage/quota` | `periodStart` and `models[]` with `tokensUsed`, `cap`, `remaining`, `periodEnd`; feeds the bars |
-| `GET /api/auth/me` | handle, region, and tier from the header; requested once |
-| `GET /api/metrics/usage` | aggregated consumption 24 h / month / 30 d, optional |
+| `GET /api/usage/quota` | `periodStart` and `models[]` with `tokensUsed`, `cap`, `remaining`, `periodEnd`; feeds the bars and the month total |
+
+Since October 2026 the routes `GET /api/auth/me` and `GET /api/metrics/usage`
+answer `401 session_required` to API keys (they only accept a browser session),
+so the widget no longer calls them.
 
 - **Consequence-based level.** Amber if the period's average rate projects ≥ 75 %
   by reset; red if at that rate the quota runs out and the blockage would last at

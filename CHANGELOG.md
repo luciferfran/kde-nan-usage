@@ -23,6 +23,10 @@ versionado [SemVer](https://semver.org/lang/es/).
 
 ### Cambiado
 
+- El widget ya no pide `GET /api/auth/me` ni `GET /api/metrics/usage`: desde
+  octubre de 2026 responden `401 session_required` a las API keys. La línea de
+  consumo del popup ahora deriva el total del mes de `GET /api/usage/quota`,
+  sin peticiones extra; eliminada la opción `showMetrics`.
 - Tests de `request()` con un `XMLHttpRequest` simulado.
 - `npm run check` agrupa lint, tests y validación QML; `lint:fix` usa
   `--write` (Biome 2); Biome fijado a 2.5.15.

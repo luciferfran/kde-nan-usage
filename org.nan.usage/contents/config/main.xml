@@ -52,10 +52,5 @@
       <label>Hide models with zero usage in the popup.</label>
       <default>true</default>
     </entry>
-
-    <entry name="showMetrics" type="Bool">
-      <label>Show aggregated usage (24 h, month, 30 days) in the popup.</label>
-      <default>true</default>
-    </entry>
   </group>
 </kcfg>

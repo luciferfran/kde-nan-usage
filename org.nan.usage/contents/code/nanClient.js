@@ -3,6 +3,11 @@
 // (api.nan.builders/v1, LiteLLM) does not expose usage; the SPA backend
 // (cloud-api.nan.builders) does, with the same API key as a Bearer token.
 // These routes are undocumented and may change without notice.
+//
+// As of 2026-10 the API key only authenticates GET /api/usage/quota (plus
+// GET /api/workspaces); /api/auth/me and /api/metrics/usage now answer 401
+// "session_required" to Bearer keys, so the widget no longer calls them.
+// The aggregated line in the popup is derived from the quota response.
 
 const CLOUD_API = "https://cloud-api.nan.builders"
 
@@ -53,22 +58,6 @@ const VALIDATORS = {
             Array.isArray(data.models) &&
             (typeof data.periodStart === "string" ||
                 typeof data.periodStart === "number")
-        )
-    },
-    "/api/auth/me": (data) => {
-        return (
-            data &&
-            typeof data === "object" &&
-            (typeof data.handle === "string" ||
-                typeof data.email === "string" ||
-                typeof data.name === "string")
-        )
-    },
-    "/api/metrics/usage": (data) => {
-        return (
-            data &&
-            typeof data === "object" &&
-            (data.last24h || data.monthToDate || data.last30d)
         )
     }
 }
@@ -169,14 +158,6 @@ function fetchQuota(key, onSuccess, onError, timeoutMs) {
     request("/api/usage/quota", key, onSuccess, onError, timeoutMs)
 }
 
-function fetchMe(key, onSuccess, onError, timeoutMs) {
-    request("/api/auth/me", key, onSuccess, onError, timeoutMs)
-}
-
-function fetchMetrics(key, onSuccess, onError, timeoutMs) {
-    request("/api/metrics/usage", key, onSuccess, onError, timeoutMs)
-}
-
 if (typeof module !== "undefined" && module.exports) {
     module.exports = {
         CLOUD_API: CLOUD_API,
@@ -187,8 +168,6 @@ if (typeof module !== "undefined" && module.exports) {
         validateResponse: validateResponse,
         keyCommand: keyCommand,
         request: request,
-        fetchQuota: fetchQuota,
-        fetchMe: fetchMe,
-        fetchMetrics: fetchMetrics
+        fetchQuota: fetchQuota
     }
 }

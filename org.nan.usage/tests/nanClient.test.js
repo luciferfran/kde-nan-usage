@@ -155,31 +155,6 @@ test("validateResponse checks API response structure", () => {
         false
     ) // no models array
 
-    // Valid me response
-    assert.strictEqual(
-        c.validateResponse("/api/auth/me", { handle: "test" }),
-        true
-    )
-    assert.strictEqual(
-        c.validateResponse("/api/auth/me", { email: "test@test.com" }),
-        true
-    )
-    assert.strictEqual(
-        c.validateResponse("/api/auth/me", { name: "Test" }),
-        true
-    )
-    assert.strictEqual(c.validateResponse("/api/auth/me", null), false)
-
-    // Valid metrics response
-    assert.strictEqual(
-        c.validateResponse("/api/metrics/usage", { last24h: {} }),
-        true
-    )
-    assert.ok(c.validateResponse("/api/metrics/usage", { monthToDate: {} }))
-    assert.ok(c.validateResponse("/api/metrics/usage", { last30d: {} }))
-    assert.strictEqual(c.validateResponse("/api/metrics/usage", {}), false)
-    assert.strictEqual(c.validateResponse("/api/metrics/usage", null), false)
-
     // No validator for unknown paths — trust them
     assert.strictEqual(
         c.validateResponse("/api/unknown", { anything: true }),

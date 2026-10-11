@@ -15,8 +15,6 @@ PlasmoidItem {
 
     // --- Quota state ---
     property var windows: []
-    property var metrics: null
-    property var account: null
     property string apiKey: ""
     // Holds either the special marker "nokey" or a user-facing message.
     property string apiErrorMessage: ""
@@ -42,14 +40,9 @@ PlasmoidItem {
     // --- Configuration mirrors (react to changes from the config dialog) ---
     property string cfgKeyPath: Plasmoid.configuration.keyPath
     property int cfgPollSeconds: Plasmoid.configuration.pollSeconds
-    property bool cfgShowMetrics: Plasmoid.configuration.showMetrics
 
     onCfgKeyPathChanged: root.readKey()
     onCfgPollSecondsChanged: root.restartPollTimer()
-    onCfgShowMetricsChanged: {
-        if (root.cfgShowMetrics)
-            root.fetchMetrics();
-    }
 
     // --- UI state classification ---
     // Distinguishes "waiting for key" (no key read yet) from
@@ -192,33 +185,10 @@ PlasmoidItem {
             root.refreshing = false;
             root.lastSuccessMs = Date.now();
             root.nowMs = Date.now();
-            if (root.cfgShowMetrics)
-                root.fetchMetrics();
-            root.fetchAccount();
         }, function (err) {
             root.apiErrorMessage = NanClient.describeError(err);
             root.stale = root.windows.length > 0;
             root.refreshing = false;
-        }, root.requestTimeoutMs);
-    }
-
-    function fetchMetrics() {
-        if (root.apiKey === "")
-            return;
-        NanClient.fetchMetrics(root.apiKey, function (data) {
-            root.metrics = data;
-        }, function () {
-            // Aggregated metrics are optional: ignore failures.
-        }, root.requestTimeoutMs);
-    }
-
-    function fetchAccount() {
-        if (root.apiKey === "" || root.account)
-            return;
-        NanClient.fetchMe(root.apiKey, function (data) {
-            root.account = data;
-        }, function () {
-            // Account details are optional: ignore failures.
         }, root.requestTimeoutMs);
     }
 
@@ -258,8 +228,6 @@ PlasmoidItem {
             hideUnused: Plasmoid.configuration.hideUnused,
             pinned: root.panelWindow ? root.panelWindow.model : null
         })
-        metrics: root.metrics
-        account: root.account
         errorText: root.errorText
         stale: root.stale
         refreshing: root.refreshing

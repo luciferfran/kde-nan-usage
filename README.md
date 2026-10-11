@@ -6,7 +6,7 @@ Un widget de KDE Plasma 6 para la cuota de tu suscripción de
 
 Muestra en el panel el porcentaje del modelo que peor va, los días hasta el
 reset y, al hacer clic, un popup con una barra por modelo, la proyección del
-ritmo de consumo y el consumo agregado de las últimas 24 h, el mes y 30 días.
+ritmo de consumo y el total del mes.
 
 ¿Todavía no tenés cuenta en NaN? Usá [este enlace de referido](https://cloud.nan.builders/r/BM7BJE4M) para registrarte.
 
@@ -42,7 +42,7 @@ ritmo de consumo y el consumo agregado de las últimas 24 h, el mes y 30 días.
 - **Aviso por consecuencia, no por porcentaje**: ámbar si al ritmo medio del
   periodo la cuota va camino de pasarse, rojo si se agotaría antes del reset
   dejándote bloqueado un buen rato.
-- **Consumo agregado** de 24 h, mes y 30 días (opcional, una petición más).
+- **Total del mes** derivado de la propia quota, sin petición extra.
 - **Sin OAuth**: lee la API key del mismo fichero que usa el CLI `nan`.
 - **Se porta bien con la API**: si NaN falla y ya había datos, los conserva y lo
   dice; entre sondeos recalcula los «reset en …» sin tocar la red.
@@ -132,7 +132,6 @@ Desde ⚙ en el popup o en la configuración del widget:
 | `showPercentage` | mostrar el porcentaje | sí |
 | `showReset` | mostrar el tiempo hasta el reset | sí |
 | `hideUnused` | ocultar en el popup los modelos con cero uso (el modelo del panel se muestra siempre) | sí |
-| `showMetrics` | línea de consumo 24 h / mes / 30 d (una petición más) | sí |
 
 ## Cómo funciona
 
@@ -143,9 +142,11 @@ público**: pueden cambiar sin aviso.
 
 | ruta | uso aquí |
 | --- | --- |
-| `GET /api/usage/quota` | `periodStart` y `models[]` con `tokensUsed`, `cap`, `remaining`, `periodEnd`; alimenta las barras |
-| `GET /api/auth/me` | handle, región y tier de la cabecera; se pide una vez |
-| `GET /api/metrics/usage` | consumo agregado 24 h / mes / 30 d, opcional |
+| `GET /api/usage/quota` | `periodStart` y `models[]` con `tokensUsed`, `cap`, `remaining`, `periodEnd`; alimenta las barras y el total del mes |
+
+Desde octubre de 2026 las rutas `GET /api/auth/me` y `GET /api/metrics/usage`
+responden `401 session_required` a las API keys (solo aceptan sesión del
+navegador), así que el widget ya no las pide.
 
 - **Nivel por consecuencia.** Ámbar si el ritmo medio del periodo proyecta ≥ 75 %
   al reset; rojo si a ese ritmo la cuota se agota y el bloqueo duraría al menos un

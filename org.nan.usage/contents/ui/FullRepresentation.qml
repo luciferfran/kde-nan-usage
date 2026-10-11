@@ -13,8 +13,6 @@ PlasmaExtras.Representation {
     id: full
 
     property var windows: []
-    property var metrics: null
-    property var account: null
     property string errorText: ""
     property bool stale: false
     property bool refreshing: false
@@ -22,12 +20,7 @@ PlasmaExtras.Representation {
 
     signal refreshRequested()
 
-    readonly property string metricsText: QuotaModel.metricsSummary(metrics)
-    readonly property string handleText: {
-        if (!account)
-            return "";
-        return String(account.handle || account.email || account.name || "");
-    }
+    readonly property string usageText: QuotaModel.usageLine(windows)
 
     implicitWidth: Kirigami.Units.gridUnit * 20
     implicitHeight: Kirigami.Units.gridUnit * 16
@@ -40,12 +33,6 @@ PlasmaExtras.Representation {
             PlasmaComponents.Label {
                 text: i18n("Uso de NaN")
                 font.bold: true
-            }
-
-            PlasmaComponents.Label {
-                visible: full.handleText !== ""
-                text: full.handleText
-                opacity: 0.7
             }
 
             Item {
@@ -98,8 +85,8 @@ PlasmaExtras.Representation {
         }
 
         PlasmaComponents.Label {
-            visible: full.metricsText !== ""
-            text: full.metricsText
+            visible: full.usageText !== ""
+            text: full.usageText
             opacity: 0.7
             Layout.fillWidth: true
             horizontalAlignment: Text.AlignRight

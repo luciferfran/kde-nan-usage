@@ -437,38 +437,28 @@ test("selectPanelWindow handles single window and ties", () => {
     assert.strictEqual(result.model, "a")
 })
 
-test("metricsSummary builds the aggregated line", () => {
-    const metrics = {
-        last24h: { totalTokens: 1.5e6 },
-        monthToDate: { totalTokens: 20e6 },
-        last30d: { totalTokens: 30e6 }
-    }
-    assert.strictEqual(
-        m.metricsSummary(metrics),
-        "24 h: 1,5M · mes: 20M · 30 d: 30M"
-    )
-    assert.strictEqual(m.metricsSummary(null), "")
+test("usageLine sums the quota windows for the month", () => {
+    const windows = [
+        { model: "a", used: 1.5e6 },
+        { model: "b", used: 20e6 }
+    ]
+    assert.strictEqual(m.usageLine(windows), "mes: 21,5M")
+    assert.strictEqual(m.usageLine([]), "")
+    assert.strictEqual(m.usageLine(null), "")
 })
 
-test("metricsSummary handles partial and zero data", () => {
-    assert.strictEqual(m.metricsSummary({}), "")
-    // Zero tokens still shown (not filtered out)
+test("usageLine handles zero and missing usage", () => {
+    assert.strictEqual(m.usageLine([{ model: "a", used: 0 }]), "mes: 0")
     assert.strictEqual(
-        m.metricsSummary({ last24h: { totalTokens: 0 } }),
-        "24 h: 0"
+        m.usageLine([{ model: "a", used: 1e9 }, { model: "b" }]),
+        "mes: 1B"
     )
-    // Missing fields: only existing ones shown
-    // Empty totalTokens object: fmtTokens(undefined) returns "0"
+    // Negative values clamp to zero
     assert.strictEqual(
-        m.metricsSummary({ last24h: {}, last30d: { totalTokens: 1000 } }),
-        "24 h: 0 · 30 d: 1K"
-    )
-    // Large values
-    assert.strictEqual(
-        m.metricsSummary({
-            last24h: { totalTokens: 1e12 },
-            last30d: { totalTokens: 1e9 }
-        }),
-        "24 h: 1000B · 30 d: 1B"
+        m.usageLine([
+            { model: "a", used: -5 },
+            { model: "b", used: 1000 }
+        ]),
+        "mes: 1K"
     )
 })
