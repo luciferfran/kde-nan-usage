@@ -143,7 +143,7 @@ contract**: they may change without notice.
 
 | route | use here |
 | --- | --- |
-| `GET /api/usage/quota` | `periodStart` and `models[]` with `tokensUsed`, `cap`, `remaining`, `periodEnd`; feeds the bars and the month total |
+| `GET /api/usage/quota` | `periodStart` and `models[]` with `tokensUsed`, `cap`, `remaining`, `periodEnd`, `extraTokens`, `extraUsable`; feeds the bars, the extra-tokens line and the month total |
 
 Since October 2026 the routes `GET /api/auth/me` and `GET /api/metrics/usage`
 answer `401 session_required` to API keys (they only accept a browser session),

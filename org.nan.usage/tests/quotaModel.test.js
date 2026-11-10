@@ -192,6 +192,9 @@ test("normalizeQuota handles the 2026-11 quota response", () => {
         ["deepseek-v4-flash", "glm5.3"]
     )
     assert.strictEqual(m.usageLine(ws), "mes: 21,5M")
+    assert.strictEqual(glm.extraTokens, 0)
+    assert.strictEqual(glm.extraUsable, true)
+    assert.strictEqual(ws.find((w) => w.model === "glm5.2").extraUsable, false)
 })
 
 test("shortModel handles empty and special model ids", () => {
@@ -556,4 +559,33 @@ test("usageLine handles zero and missing usage", () => {
         ]),
         "mes: 1K"
     )
+})
+
+test("extraLine shows extra tokens and whether they are usable", () => {
+    assert.strictEqual(
+        m.extraLine({ extraTokens: 0, extraUsable: true }),
+        "extra: 0 · utilizable"
+    )
+    assert.strictEqual(
+        m.extraLine({ extraTokens: 250e6, extraUsable: false }),
+        "extra: 250M · no utilizable"
+    )
+    assert.strictEqual(m.extraLine({ extraTokens: 5e6 }), "extra: 5M")
+    assert.strictEqual(
+        m.extraLine({ extraUsable: true }),
+        "extra: ? · utilizable"
+    )
+    assert.strictEqual(
+        m.extraLine({ extraTokens: null, extraUsable: null }),
+        ""
+    )
+    assert.strictEqual(m.extraLine(null), "")
+})
+
+test("normalizeQuota leaves extra fields null when missing or invalid", () => {
+    const [w] = m.normalizeQuota({
+        models: [{ model: "x", tokensUsed: 1, cap: 10, extraUsable: "yes" }]
+    })
+    assert.strictEqual(w.extraTokens, null)
+    assert.strictEqual(w.extraUsable, null)
 })

@@ -16,6 +16,7 @@ ColumnLayout {
 
     readonly property real pct: windowData ? windowData.utilization : 0
     readonly property string note: windowData ? QuotaModel.projectionNote(windowData, nowMs) : ""
+    readonly property string extra: windowData ? QuotaModel.extraLine(windowData) : ""
 
     RowLayout {
         Layout.fillWidth: true
@@ -53,6 +54,14 @@ ColumnLayout {
         font: Kirigami.Theme.smallFont
         opacity: 0.7
         wrapMode: Text.WordWrap
+        Layout.fillWidth: true
+    }
+
+    PlasmaComponents.Label {
+        visible: row.extra !== ""
+        text: row.extra
+        font: Kirigami.Theme.smallFont
+        opacity: 0.6
         Layout.fillWidth: true
     }
 }

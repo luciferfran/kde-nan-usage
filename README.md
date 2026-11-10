@@ -142,7 +142,7 @@ público**: pueden cambiar sin aviso.
 
 | ruta | uso aquí |
 | --- | --- |
-| `GET /api/usage/quota` | `periodStart` y `models[]` con `tokensUsed`, `cap`, `remaining`, `periodEnd`; alimenta las barras y el total del mes |
+| `GET /api/usage/quota` | `periodStart` y `models[]` con `tokensUsed`, `cap`, `remaining`, `periodEnd`, `extraTokens`, `extraUsable`; alimenta las barras, la línea de tokens extra y el total del mes |
 
 Desde octubre de 2026 las rutas `GET /api/auth/me` y `GET /api/metrics/usage`
 responden `401 session_required` a las API keys (solo aceptan sesión del

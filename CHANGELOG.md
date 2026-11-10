@@ -5,6 +5,12 @@ versionado [SemVer](https://semver.org/lang/es/).
 
 ## [No publicado]
 
+### Añadido
+
+- Popup: bajo cada barra, una línea con los tokens extra del modelo
+  (`extraTokens`) y si los puede usar (`extraUsable`), p. ej.
+  «extra: 0 · utilizable». Se oculta si la API no envía esos campos.
+
 ### Fijo
 
 - Tests: `nanClient.test.js` salía con código 0 aunque fallaran los tests
@@ -28,7 +34,7 @@ versionado [SemVer](https://semver.org/lang/es/).
   `deepseek-v4-flash` y `glm5.2`): aparecen solos en el popup porque las
   barras salen de `GET /api/usage/quota`, sin lista fija. En el panel se
   abrevian como `glm5.3f`, `qwen3.8f` y `mimo-v2.6f`. Los campos nuevos
-  `extraTokens` y `extraUsable` se ignoran por ahora. Tests con la forma
+  `extraTokens` y `extraUsable` se muestran en el popup (ver «Añadido»). Tests con la forma
   actual de la respuesta.
 - El widget ya no pide `GET /api/auth/me` ni `GET /api/metrics/usage`: desde
   octubre de 2026 responden `401 session_required` a las API keys. La línea de

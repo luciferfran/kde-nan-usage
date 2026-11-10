@@ -72,7 +72,8 @@ function humanDuration(ms, compact) {
 
 // Sorted (usage desc) list of normalized windows:
 //   {key, model, label, used, cap, remaining, utilization, startsAt, resetsAt,
-//    windowHours, windowCap, updatedAt}
+//    windowHours, windowCap, updatedAt, extraTokens, extraUsable}
+// extraTokens/extraUsable are null when the API does not send them.
 // Dates in ms. Entries without model or cap are dropped.
 function normalizeQuota(quota) {
     const startsAt = parseDate(quota?.periodStart)
@@ -99,7 +100,12 @@ function normalizeQuota(quota) {
             resetsAt: parseDate(m.periodEnd),
             windowHours: Number(m.windowHours) || 0,
             windowCap: Number(m.fullWindowTokens) || 0,
-            updatedAt: parseDate(m.updatedAt)
+            updatedAt: parseDate(m.updatedAt),
+            extraTokens: Number.isFinite(Number(m.extraTokens))
+                ? Math.max(0, Number(m.extraTokens))
+                : null,
+            extraUsable:
+                typeof m.extraUsable === "boolean" ? m.extraUsable : null
         })
     }
     out.sort(
@@ -185,6 +191,18 @@ function projectionNote(w, now) {
     return ""
 }
 
+// Extra-token line for a popup row: "extra: 0 · utilizable". Empty when the
+// API sent neither field.
+function extraLine(w) {
+    const hasTokens = w?.extraTokens != null
+    const hasUsable = w?.extraUsable != null
+    if (!hasTokens && !hasUsable) return ""
+    const parts = []
+    parts.push(`extra: ${hasTokens ? fmtTokens(w.extraTokens) : "?"}`)
+    if (hasUsable) parts.push(w.extraUsable ? "utilizable" : "no utilizable")
+    return parts.join(" · ")
+}
+
 // Windows listed in the popup: with hideUnused, zero-usage windows are removed
 // except the model pinned to the panel, which is always shown.
 function visibleWindows(windows, options) {
@@ -240,6 +258,7 @@ if (typeof module !== "undefined" && module.exports) {
         lockoutMs: lockoutMs,
         windowLevel: windowLevel,
         projectionNote: projectionNote,
+        extraLine: extraLine,
         visibleWindows: visibleWindows,
         selectPanelWindow: selectPanelWindow,
         usageLine: usageLine
