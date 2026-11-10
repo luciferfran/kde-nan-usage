@@ -99,6 +99,101 @@ test("shortModel abbreviates known model ids", () => {
     assert.strictEqual(m.shortModel(null), "")
 })
 
+test("shortModel abbreviates the models offered since 2026-11", () => {
+    assert.strictEqual(m.shortModel("glm5.2"), "glm5.2")
+    assert.strictEqual(m.shortModel("glm5.3"), "glm5.3")
+    assert.strictEqual(m.shortModel("glm5.3-flash"), "glm5.3f")
+    assert.strictEqual(m.shortModel("qwen3.8-flash"), "qwen3.8f")
+    assert.strictEqual(m.shortModel("mimo-v2.6-flash"), "mimo-v2.6f")
+})
+
+test("normalizeQuota handles the 2026-11 quota response", () => {
+    // Shape returned by GET /api/usage/quota in November 2026: new models,
+    // GLM with a 4 h rolling window and its own periodEnd, plus the
+    // extraTokens/extraUsable fields the widget ignores.
+    const ws = m.normalizeQuota({
+        periodStart: "2026-11-01",
+        models: [
+            {
+                model: "deepseek-v4-flash",
+                tokensUsed: 21465832,
+                cap: 3e9,
+                remaining: 2978534168,
+                periodEnd: "2026-12-01T00:00:00Z",
+                extraTokens: 0,
+                extraUsable: true
+            },
+            {
+                model: "glm5.2",
+                tokensUsed: 0,
+                cap: 3e9,
+                remaining: 3e9,
+                periodEnd: "2026-11-13T09:41:34Z",
+                fullWindowTokens: 4e8,
+                windowHours: 4,
+                extraTokens: 0,
+                extraUsable: false
+            },
+            {
+                model: "glm5.3",
+                tokensUsed: 0,
+                cap: 3e9,
+                remaining: 3e9,
+                periodEnd: "2026-11-13T09:41:34Z",
+                fullWindowTokens: 4e8,
+                windowHours: 4,
+                extraTokens: 0,
+                extraUsable: true
+            },
+            {
+                model: "qwen3.8-flash",
+                tokensUsed: 0,
+                cap: 5e8,
+                remaining: 5e8,
+                periodEnd: "2026-12-01T00:00:00Z",
+                extraTokens: 0,
+                extraUsable: true
+            },
+            {
+                model: "mimo-v2.6-flash",
+                tokensUsed: 0,
+                cap: 1e9,
+                remaining: 1e9,
+                periodEnd: "2026-12-01T00:00:00Z",
+                extraTokens: 0,
+                extraUsable: true
+            },
+            {
+                model: "glm5.3-flash",
+                tokensUsed: 0,
+                cap: 2e9,
+                remaining: 2e9,
+                periodEnd: "2026-12-01T00:00:00Z",
+                extraTokens: 0,
+                extraUsable: true
+            }
+        ]
+    })
+    assert.strictEqual(ws.length, 6)
+    assert.strictEqual(ws[0].model, "deepseek-v4-flash")
+    assert.deepStrictEqual(
+        ws.slice(1).map((w) => w.model),
+        ["glm5.2", "glm5.3", "glm5.3-flash", "mimo-v2.6-flash", "qwen3.8-flash"]
+    )
+    const glm = ws.find((w) => w.model === "glm5.3")
+    assert.strictEqual(glm.windowHours, 4)
+    assert.strictEqual(glm.windowCap, 4e8)
+    assert.strictEqual(glm.resetsAt, Date.parse("2026-11-13T09:41:34Z"))
+    assert.strictEqual(ws.find((w) => w.model === "qwen3.8-flash").cap, 5e8)
+    assert.deepStrictEqual(
+        m
+            .visibleWindows(ws, { hideUnused: true, pinned: "glm5.3" })
+            .map((w) => w.model),
+        ["deepseek-v4-flash", "glm5.3"]
+    )
+    assert.strictEqual(m.usageLine(ws), "mes: 21,5M")
+})
+
 test("shortModel handles empty and special model ids", () => {
     assert.strictEqual(m.shortModel(""), "")
     assert.strictEqual(m.shortModel(42), "42")

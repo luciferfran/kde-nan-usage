@@ -23,6 +23,13 @@ versionado [SemVer](https://semver.org/lang/es/).
 
 ### Cambiado
 
+- Comprobado contra los modelos que NaN ofrece desde noviembre de 2026
+  (`glm5.3`, `glm5.3-flash`, `qwen3.8-flash`, `mimo-v2.6-flash`, además de
+  `deepseek-v4-flash` y `glm5.2`): aparecen solos en el popup porque las
+  barras salen de `GET /api/usage/quota`, sin lista fija. En el panel se
+  abrevian como `glm5.3f`, `qwen3.8f` y `mimo-v2.6f`. Los campos nuevos
+  `extraTokens` y `extraUsable` se ignoran por ahora. Tests con la forma
+  actual de la respuesta.
 - El widget ya no pide `GET /api/auth/me` ni `GET /api/metrics/usage`: desde
   octubre de 2026 responden `401 session_required` a las API keys. La línea de
   consumo del popup ahora deriva el total del mes de `GET /api/usage/quota`,
