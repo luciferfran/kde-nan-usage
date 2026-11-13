@@ -7,6 +7,19 @@ versionado [SemVer](https://semver.org/lang/es/).
 
 ### Añadido
 
+- Fondo de créditos (#1): el widget lee `GET api.nan.builders/v1/usage`
+  (informe en vivo por día y modelo) además de `/api/usage/quota`. Si la
+  respuesta trae `credits`, el medidor del panel es `used / allowance` con
+  reinicio en `period_end` y proyección de ritmo; las barras por modelo
+  muestran los créditos gastados (su parte del fondo) y la línea `mes:` suma
+  tokens y créditos. `credits` es opcional y un fondo `frozen` se indica en
+  la nota de la barra.
+- Una barra de la cuota cuyo `updatedAt` es anterior a la última actividad
+  del modelo se marca «sin actualizar desde …», no genera alertas y el panel
+  no la elige.
+- `/api/usage/quota` sigue siendo el respaldo: si `/v1/usage` falla, el
+  widget funciona como antes. Solo hay error si fallan las dos rutas.
+
 - Popup: bajo cada barra, una línea con los tokens extra del modelo
   (`extraTokens`) y si los puede usar (`extraUsable`), p. ej.
   «extra: 0 · utilizable». Se oculta si la API no envía esos campos.
@@ -29,6 +42,9 @@ versionado [SemVer](https://semver.org/lang/es/).
 
 ### Cambiado
 
+- `nanClient.request()` acepta un host (`INFERENCE_API` o `CLOUD_API`) y
+  `validateResponse` ignora la query string; nuevo validador para
+  `/v1/usage`. README corregido: la API de inferencia sí expone uso.
 - Comprobado contra los modelos que NaN ofrece desde noviembre de 2026
   (`glm5.3`, `glm5.3-flash`, `qwen3.8-flash`, `mimo-v2.6-flash`, además de
   `deepseek-v4-flash` y `glm5.2`): aparecen solos en el popup porque las

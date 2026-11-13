@@ -49,6 +49,14 @@ function fmtPct(util, fine) {
     return `${Math.round(v)}%`
 }
 
+// Credits: integer from 100, one decimal below (13,5; 7).
+function fmtCredits(n) {
+    const num = Number(n)
+    const v = Number.isFinite(num) ? Math.max(0, num) : 0
+    if (v >= 100) return String(Math.round(v))
+    return v.toFixed(1).replace(/0+$/, "").replace(/\.$/, "").replace(".", ",")
+}
+
 // Short model name for the panel, like `nan status`: deepseek-v4-flash -> ds4f.
 function shortModel(id) {
     return String(id == null ? "" : id)
@@ -115,6 +123,214 @@ function normalizeQuota(quota) {
     return out
 }
 
+// UTC calendar day (YYYY-MM-DD) of a timestamp in ms.
+function isoDay(ms) {
+    return new Date(ms).toISOString().slice(0, 10)
+}
+
+// First day of the month of `now`, to bound GET /v1/usage to one page.
+function monthStart(now) {
+    if (now == null) now = Date.now()
+    return `${isoDay(now).slice(0, 7)}-01`
+}
+
+// Summary of GET /v1/usage (the live report, unlike the frozen quota):
+//   {credits, models, totalTokens, totalCredits, partial}
+// credits: the credit fund {used, allowance, remaining, startsAt, resetsAt,
+//   frozen} or null when the account has none (the block is optional).
+// models: [{model, tokens, requests, credits, lastDate}] summed over the
+//   current period (the fund's, or the whole report without a fund).
+//   lastDate is the latest day with activity in the whole report.
+// partial: the report has more pages, so the sums are incomplete.
+// Returns null when the response is not a usage report.
+function normalizeUsage(report) {
+    if (report?.object !== "usage.report" || !Array.isArray(report.data))
+        return null
+
+    const c = report.credits
+    const allowance = Number(c?.allowance)
+    let credits = null
+    if (Number.isFinite(allowance) && allowance > 0) {
+        const used = Math.max(0, Number(c.used) || 0)
+        credits = {
+            used: used,
+            allowance: allowance,
+            remaining:
+                typeof c.remaining === "number" && Number.isFinite(c.remaining)
+                    ? Math.max(0, c.remaining)
+                    : Math.max(0, allowance - used),
+            startsAt: parseDate(c.period_start),
+            resetsAt: parseDate(c.period_end),
+            frozen: c.frozen === true
+        }
+    }
+
+    const since = credits?.startsAt
+        ? isoDay(credits.startsAt)
+        : String(report.start_date || "")
+    const byModel = Object.create(null)
+    for (let i = 0; i < report.data.length; i++) {
+        const row = report.data[i]
+        if (!row?.model || typeof row.date !== "string") continue
+        const tokens = Math.max(
+            0,
+            Number(row.total_tokens) ||
+                (Number(row.prompt_tokens) || 0) +
+                    (Number(row.completion_tokens) || 0)
+        )
+        const requests = Math.max(0, Number(row.api_requests) || 0)
+        if (!byModel[row.model])
+            byModel[row.model] = {
+                model: String(row.model),
+                tokens: 0,
+                requests: 0,
+                credits: 0,
+                lastDate: ""
+            }
+        const entry = byModel[row.model]
+        if (tokens > 0 || requests > 0) {
+            if (row.date > entry.lastDate) entry.lastDate = row.date
+        }
+        if (row.date < since) continue
+        entry.tokens += tokens
+        entry.requests += requests
+        entry.credits += Math.max(0, Number(row.credits) || 0)
+    }
+
+    const models = Object.keys(byModel).map((k) => byModel[k])
+    let totalTokens = 0
+    let totalCredits = 0
+    for (let i = 0; i < models.length; i++) {
+        totalTokens += models[i].tokens
+        totalCredits += models[i].credits
+    }
+    return {
+        credits: credits,
+        models: models,
+        totalTokens: totalTokens,
+        totalCredits: credits ? credits.used : totalCredits,
+        partial: report.has_more === true
+    }
+}
+
+// The credit fund as a window the gauges and projections understand.
+function creditsWindow(credits) {
+    return {
+        key: "credits",
+        kind: "credits",
+        model: "credits",
+        label: "Créditos",
+        used: credits.used,
+        cap: credits.allowance,
+        remaining: credits.remaining,
+        utilization: (credits.used / credits.allowance) * 100,
+        startsAt: credits.startsAt,
+        resetsAt: credits.resetsAt,
+        windowHours: 0,
+        windowCap: 0,
+        updatedAt: null,
+        extraTokens: null,
+        extraUsable: null,
+        frozen: credits.frozen
+    }
+}
+
+// Windows shown by the widget, combining the quota (caps, extra tokens) with
+// the live usage report (credit fund, activity). `usage` comes from
+// normalizeUsage(); without it the widget falls back to the quota alone.
+//   - With a credit fund: the fund is the main gauge and the per-model rows
+//     are the credits spent (kind "spend"), since the quota caps no longer
+//     limit anything.
+//   - Without one: the quota windows, but any whose counters stopped before
+//     the model's last activity are marked stale.
+function buildWindows(quota, usage) {
+    const quotaWindows = normalizeQuota(quota)
+    if (!usage) return quotaWindows
+
+    const lastDate = Object.create(null)
+    for (let i = 0; i < usage.models.length; i++)
+        lastDate[usage.models[i].model] = usage.models[i].lastDate
+
+    if (!usage.credits || usage.partial) {
+        for (let i = 0; i < quotaWindows.length; i++) {
+            const w = quotaWindows[i]
+            const last = lastDate[w.model]
+            const updated = w.updatedAt ? isoDay(w.updatedAt) : ""
+            if (last && updated && updated < last) {
+                w.stale = true
+                w.staleSince = updated
+            }
+        }
+    }
+    if (!usage.credits) return quotaWindows
+
+    const out = [creditsWindow(usage.credits)]
+    if (usage.partial) return out.concat(quotaWindows)
+
+    const rows = usage.models.slice()
+    for (let i = 0; i < quotaWindows.length; i++) {
+        if (!rows.some((r) => r.model === quotaWindows[i].model))
+            rows.push({
+                model: quotaWindows[i].model,
+                tokens: 0,
+                requests: 0,
+                credits: 0,
+                lastDate: ""
+            })
+    }
+    const byCredits = usage.totalCredits > 0
+    let share = 0
+    for (let i = 0; i < rows.length; i++)
+        share += byCredits ? rows[i].credits : rows[i].tokens
+    rows.sort(
+        (a, b) =>
+            b.credits - a.credits ||
+            b.tokens - a.tokens ||
+            a.model.localeCompare(b.model)
+    )
+    for (let i = 0; i < rows.length; i++) {
+        const r = rows[i]
+        const q = quotaWindows.find((w) => w.model === r.model)
+        out.push({
+            key: r.model,
+            kind: "spend",
+            model: r.model,
+            label: r.model,
+            // Tokens, so "used > 0" keeps meaning "has activity".
+            used: r.tokens,
+            credits: r.credits,
+            requests: r.requests,
+            cap: 0,
+            remaining: 0,
+            // Share of the fund (or of the tokens, before credits were
+            // billed) taken by this model: the bar is not a quota.
+            utilization:
+                share > 0
+                    ? ((byCredits ? r.credits : r.tokens) / share) * 100
+                    : 0,
+            startsAt: null,
+            resetsAt: null,
+            windowHours: 0,
+            windowCap: 0,
+            updatedAt: null,
+            extraTokens: q ? q.extraTokens : null,
+            extraUsable: q ? q.extraUsable : null
+        })
+    }
+    return out
+}
+
+// Right-hand figure of a popup row, by kind of window.
+function windowDetail(w) {
+    if (w?.kind === "credits")
+        return `${fmtCredits(w.used)} / ${fmtCredits(w.cap)} cr`
+    if (w?.kind === "spend")
+        return w.credits > 0
+            ? `${fmtCredits(w.credits)} cr · ${fmtTokens(w.used)}`
+            : fmtTokens(w.used)
+    return `${fmtTokens(w?.used)} / ${fmtTokens(w?.cap)}`
+}
+
 // Period timing for a window, or null when there is nothing to extrapolate
 // from (no dates, finished period, or period just started).
 function periodTimes(w, now) {
@@ -162,6 +378,8 @@ function lockoutMs(w, now) {
 // rate points high or runs out just before the reset.
 function windowLevel(w, now) {
     if (now == null) now = Date.now()
+    // A stale counter says nothing about the present; a spend row is a share.
+    if (w.stale || w.kind === "spend") return "ok"
     let level = utilLevel(w.utilization)
     const t = periodTimes(w, now)
     const lock = lockoutMs(w, now)
@@ -177,6 +395,8 @@ function windowLevel(w, now) {
 // Footer note for a bar, tied to the same threshold as windowLevel.
 function projectionNote(w, now) {
     if (now == null) now = Date.now()
+    if (w.stale) return `sin actualizar desde ${w.staleSince}`
+    if (w.frozen) return "fondo de créditos congelado"
     const t = periodTimes(w, now)
     if (!t) return ""
     const lock = lockoutMs(w, now)
@@ -218,12 +438,16 @@ function visibleWindows(windows, options) {
 function selectPanelWindow(windows, mode, modelId, now) {
     if (now == null) now = Date.now()
     if (!windows?.length) return null
+    // Stale counters and spend shares are not gauges; use them only if there
+    // is nothing else to show.
+    const live = windows.filter((w) => !w.stale && w.kind !== "spend")
+    const candidates = live.length ? live : windows
     if (mode === "fixed") {
-        const hit = windows.find((w) => w.model === modelId)
+        const hit = candidates.find((w) => w.model === modelId)
         if (hit) return hit
     }
-    const used = windows.filter((w) => w.used > 0)
-    const pool = used.length ? used : windows
+    const used = candidates.filter((w) => w.used > 0)
+    const pool = used.length ? used : candidates
     if (mode === "max")
         return pool.reduce((best, w) =>
             w.utilization > best.utilization ? w : best
@@ -232,11 +456,18 @@ function selectPanelWindow(windows, mode, modelId, now) {
     return pool.reduce((best, w) => (score(w) > score(best) ? w : best))
 }
 
-// Aggregated usage line for the popup, derived from the normalized quota
-// windows (sum of tokens used in the current plan period). Replaces the old
-// /api/metrics/usage call, which now requires a browser session.
-function usageLine(windows) {
-    if (!windows || !windows.length) return ""
+// Aggregated usage line for the popup. From the live usage report when there
+// is one (tokens and credits of the current period); otherwise the sum of
+// tokens used in the quota windows.
+function usageLine(windows, usage) {
+    if (usage) {
+        const credits =
+            usage.totalCredits > 0
+                ? ` · ${fmtCredits(usage.totalCredits)} cr`
+                : ""
+        return `mes: ${fmtTokens(usage.totalTokens)}${credits}`
+    }
+    if (!windows?.length) return ""
     let total = 0
     for (let i = 0; i < windows.length; i++)
         total += Math.max(0, Number(windows[i]?.used) || 0)
@@ -250,6 +481,12 @@ if (typeof module !== "undefined" && module.exports) {
         maxLevel: maxLevel,
         fmtTokens: fmtTokens,
         fmtPct: fmtPct,
+        fmtCredits: fmtCredits,
+        isoDay: isoDay,
+        monthStart: monthStart,
+        normalizeUsage: normalizeUsage,
+        buildWindows: buildWindows,
+        windowDetail: windowDetail,
         shortModel: shortModel,
         humanDuration: humanDuration,
         normalizeQuota: normalizeQuota,

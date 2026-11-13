@@ -15,6 +15,9 @@ PlasmoidItem {
 
     // --- Quota state ---
     property var windows: []
+    // Summary of GET /v1/usage (credit fund, month totals); null when that
+    // endpoint failed and the widget runs on the quota alone.
+    property var usage: null
     property string apiKey: ""
     // Holds either the special marker "nokey" or a user-facing message.
     property string apiErrorMessage: ""
@@ -178,17 +181,48 @@ PlasmoidItem {
         root.lastRequestMs = now;
         root.refreshing = true;
 
-        NanClient.fetchQuota(root.apiKey, function (quota) {
-            root.windows = QuotaModel.normalizeQuota(quota);
+        // Two sources in parallel: /v1/usage is the live one (credit fund,
+        // activity); /api/usage/quota adds caps and extra tokens and is the
+        // fallback when /v1/usage fails. It is an error only if both fail.
+        let pending = 2;
+        let quotaData = null;
+        let usageData = null;
+        let quotaErr = null;
+        let usageErr = null;
+
+        function finish() {
+            pending -= 1;
+            if (pending > 0) return;
+            if (quotaData === null && usageData === null) {
+                root.apiErrorMessage = NanClient.describeError(quotaErr || usageErr);
+                root.stale = root.windows.length > 0;
+                root.refreshing = false;
+                return;
+            }
+            const summary = QuotaModel.normalizeUsage(usageData);
+            root.usage = summary;
+            root.windows = QuotaModel.buildWindows(quotaData, summary);
             root.apiErrorMessage = "";
             root.stale = false;
             root.refreshing = false;
             root.lastSuccessMs = Date.now();
             root.nowMs = Date.now();
+        }
+
+        NanClient.fetchUsage(root.apiKey, QuotaModel.monthStart(now), function (report) {
+            usageData = report;
+            finish();
         }, function (err) {
-            root.apiErrorMessage = NanClient.describeError(err);
-            root.stale = root.windows.length > 0;
-            root.refreshing = false;
+            usageErr = err;
+            finish();
+        }, root.requestTimeoutMs);
+
+        NanClient.fetchQuota(root.apiKey, function (quota) {
+            quotaData = quota;
+            finish();
+        }, function (err) {
+            quotaErr = err;
+            finish();
         }, root.requestTimeoutMs);
     }
 
@@ -224,6 +258,7 @@ PlasmoidItem {
     }
 
     fullRepresentation: FullRepresentation {
+        usage: root.usage
         windows: QuotaModel.visibleWindows(root.windows, {
             hideUnused: Plasmoid.configuration.hideUnused,
             pinned: root.panelWindow ? root.panelWindow.model : null

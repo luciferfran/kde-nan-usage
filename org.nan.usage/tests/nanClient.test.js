@@ -308,3 +308,76 @@ test("request calls back only once even if events repeat", () => {
     delete global.XMLHttpRequest
     assert.strictEqual(count, 1)
 })
+
+// --- GET /v1/usage (inference host) ---
+
+const USAGE_REPORT = {
+    object: "usage.report",
+    start_date: "2026-11-01",
+    end_date: "2026-11-13",
+    data: [],
+    has_more: false
+}
+
+test("fetchUsage calls the inference host with start_date", () => {
+    const sent = installFakeXhr(() => ({
+        status: 200,
+        body: JSON.stringify(USAGE_REPORT)
+    }))
+    const calls = []
+    c.fetchUsage(
+        "secret",
+        "2026-11-01",
+        (b) => calls.push(["ok", b]),
+        (e) => calls.push(["err", e])
+    )
+    delete global.XMLHttpRequest
+    assert.strictEqual(
+        sent[0].url,
+        "https://api.nan.builders/v1/usage?start_date=2026-11-01"
+    )
+    assert.strictEqual(sent[0].headers.Authorization, "Bearer secret")
+    assert.deepStrictEqual(calls, [["ok", USAGE_REPORT]])
+})
+
+test("fetchUsage ignores a malformed start_date", () => {
+    const sent = installFakeXhr(() => ({ status: 200, body: "{}" }))
+    c.fetchUsage(
+        "k",
+        "x&y=1",
+        () => {},
+        () => {}
+    )
+    delete global.XMLHttpRequest
+    assert.strictEqual(sent[0].url, "https://api.nan.builders/v1/usage")
+})
+
+test("/v1/usage validator requires a usage.report with data[]", () => {
+    assert.strictEqual(c.validateResponse("/v1/usage", USAGE_REPORT), true)
+    assert.strictEqual(
+        c.validateResponse("/v1/usage?start_date=2026-11-01", USAGE_REPORT),
+        true
+    )
+    assert.strictEqual(c.validateResponse("/v1/usage", {}), false)
+    assert.strictEqual(
+        c.validateResponse("/v1/usage", { object: "list", data: [] }),
+        false
+    )
+    assert.strictEqual(
+        c.validateResponse("/v1/usage", { object: "usage.report" }),
+        false
+    )
+})
+
+test("fetchUsage reports a parse error for an unexpected body", () => {
+    installFakeXhr(() => ({ status: 200, body: JSON.stringify({ ok: 1 }) }))
+    const calls = []
+    c.fetchUsage(
+        "k",
+        null,
+        (b) => calls.push(["ok", b]),
+        (e) => calls.push(["err", e.kind])
+    )
+    delete global.XMLHttpRequest
+    assert.deepStrictEqual(calls, [["err", "parse"]])
+})

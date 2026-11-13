@@ -23,20 +23,20 @@ ColumnLayout {
         spacing: Kirigami.Units.smallSpacing
 
         PlasmaComponents.Label {
-            text: row.windowData ? row.windowData.model : ""
+            text: row.windowData ? row.windowData.label : ""
             font.bold: true
             elide: Text.ElideRight
             Layout.fillWidth: true
         }
 
         PlasmaComponents.Label {
-            text: row.windowData
-                ? QuotaModel.fmtTokens(row.windowData.used) + " / " + QuotaModel.fmtTokens(row.windowData.cap)
-                : ""
+            text: row.windowData ? QuotaModel.windowDetail(row.windowData) : ""
             opacity: 0.8
         }
 
         PlasmaComponents.Label {
+            // A spend row is a share of the fund, not a quota percentage.
+            visible: row.windowData !== null && row.windowData.kind !== "spend"
             text: row.windowData ? QuotaModel.fmtPct(row.windowData.utilization, true) : ""
         }
     }

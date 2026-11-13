@@ -13,6 +13,7 @@ PlasmaExtras.Representation {
     id: full
 
     property var windows: []
+    property var usage: null
     property string errorText: ""
     property bool stale: false
     property bool refreshing: false
@@ -20,7 +21,7 @@ PlasmaExtras.Representation {
 
     signal refreshRequested()
 
-    readonly property string usageText: QuotaModel.usageLine(windows)
+    readonly property string usageText: QuotaModel.usageLine(windows, usage)
 
     implicitWidth: Kirigami.Units.gridUnit * 20
     implicitHeight: Kirigami.Units.gridUnit * 16
