@@ -1,15 +1,19 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Minimal HTTP client for the NaN cloud backend. The inference API
-// (api.nan.builders/v1, LiteLLM) does not expose usage; the SPA backend
-// (cloud-api.nan.builders) does, with the same API key as a Bearer token.
+// Minimal HTTP client for the NaN backends. Two hosts expose usage, both with
+// the same API key as a Bearer token:
+//   - api.nan.builders (inference API, LiteLLM): GET /v1/usage, the per-day,
+//     per-model report plus the credit fund. Live data; the primary source.
+//   - cloud-api.nan.builders (SPA backend): GET /api/usage/quota. Since the
+//     credit fund (2026-11) its counters stop updating, so it is only used for
+//     the per-model caps/extra tokens and as a fallback.
 // These routes are undocumented and may change without notice.
 //
 // As of 2026-10 the API key only authenticates GET /api/usage/quota (plus
-// GET /api/workspaces); /api/auth/me and /api/metrics/usage now answer 401
-// "session_required" to Bearer keys, so the widget no longer calls them.
-// The aggregated line in the popup is derived from the quota response.
+// GET /api/workspaces) on the SPA backend; /api/auth/me and
+// /api/metrics/usage answer 401 "session_required" to Bearer keys.
 
 const CLOUD_API = "https://cloud-api.nan.builders"
+const INFERENCE_API = "https://api.nan.builders"
 
 // User-facing text for an error from this client. Never includes the key.
 function describeError(e) {
@@ -59,11 +63,20 @@ const VALIDATORS = {
             (typeof data.periodStart === "string" ||
                 typeof data.periodStart === "number")
         )
+    },
+    "/v1/usage": (data) => {
+        return (
+            data &&
+            typeof data === "object" &&
+            data.object === "usage.report" &&
+            Array.isArray(data.data)
+        )
     }
 }
 
+// The validator is chosen by the path without its query string.
 function validateResponse(path, data) {
-    const validator = VALIDATORS[path]
+    const validator = VALIDATORS[String(path).split("?")[0]]
     if (!validator) return true // No validator defined; trust the response
     return Boolean(validator(data))
 }
@@ -84,7 +97,8 @@ function keyCommand(path) {
 // exactly once. The error object carries {status, kind, message} and is safe to
 // pass to describeError().
 // timeoutMs: optional request timeout in ms (default 15000).
-function request(path, key, onSuccess, onError, timeoutMs) {
+// base: host to call (default CLOUD_API).
+function request(path, key, onSuccess, onError, timeoutMs, base) {
     const xhr = new XMLHttpRequest()
     let finished = false
 
@@ -110,7 +124,7 @@ function request(path, key, onSuccess, onError, timeoutMs) {
     }
 
     try {
-        xhr.open("GET", CLOUD_API + path)
+        xhr.open("GET", (base ?? CLOUD_API) + path)
         xhr.setRequestHeader("Authorization", `Bearer ${key}`)
         xhr.setRequestHeader("Accept", "application/json")
     } catch (e) {
@@ -158,9 +172,26 @@ function fetchQuota(key, onSuccess, onError, timeoutMs) {
     request("/api/usage/quota", key, onSuccess, onError, timeoutMs)
 }
 
+// GET /v1/usage on the inference host. startDate (YYYY-MM-DD) bounds the
+// report so it stays on one page; without it the API returns the last 30 days.
+function fetchUsage(key, startDate, onSuccess, onError, timeoutMs) {
+    const query = /^\d{4}-\d{2}-\d{2}$/.test(String(startDate || ""))
+        ? `?start_date=${startDate}`
+        : ""
+    request(
+        `/v1/usage${query}`,
+        key,
+        onSuccess,
+        onError,
+        timeoutMs,
+        INFERENCE_API
+    )
+}
+
 if (typeof module !== "undefined" && module.exports) {
     module.exports = {
         CLOUD_API: CLOUD_API,
+        INFERENCE_API: INFERENCE_API,
         VALIDATORS: VALIDATORS,
         describeError: describeError,
         shellQuote: shellQuote,
@@ -168,6 +199,7 @@ if (typeof module !== "undefined" && module.exports) {
         validateResponse: validateResponse,
         keyCommand: keyCommand,
         request: request,
-        fetchQuota: fetchQuota
+        fetchQuota: fetchQuota,
+        fetchUsage: fetchUsage
     }
 }

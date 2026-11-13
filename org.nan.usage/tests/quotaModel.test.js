@@ -589,3 +589,345 @@ test("normalizeQuota leaves extra fields null when missing or invalid", () => {
     assert.strictEqual(w.extraTokens, null)
     assert.strictEqual(w.extraUsable, null)
 })
+
+// --- GET /v1/usage and the credit fund (issue #1) ---
+
+// Quota as observed on 2026-11-13: counters frozen at `updatedAt`, old caps.
+const FROZEN_QUOTA = {
+    periodStart: "2026-11-01",
+    models: [
+        {
+            model: "deepseek-v4-flash",
+            tokensUsed: 21465832,
+            cap: 3e9,
+            periodEnd: "2026-12-01T00:00:00Z",
+            updatedAt: "2026-11-04",
+            extraTokens: 0,
+            extraUsable: true
+        },
+        {
+            model: "glm5.3",
+            tokensUsed: 4e6,
+            cap: 3e9,
+            periodEnd: "2026-11-13T09:41:34Z",
+            updatedAt: "2026-11-11",
+            extraTokens: 0,
+            extraUsable: false
+        },
+        {
+            model: "qwen3.8-flash",
+            tokensUsed: 0,
+            cap: 5e8,
+            periodEnd: "2026-12-01T00:00:00Z"
+        }
+    ]
+}
+
+function usageRow(date, model, tokens, credits) {
+    return {
+        date: date,
+        model: model,
+        prompt_tokens: tokens - 10,
+        completion_tokens: 10,
+        total_tokens: tokens,
+        api_requests: 1,
+        cached_tokens: 0,
+        credits: credits
+    }
+}
+
+const USAGE_REPORT = {
+    object: "usage.report",
+    start_date: "2026-11-01",
+    end_date: "2026-11-13",
+    data: [
+        usageRow("2026-11-03", "deepseek-v4-flash", 1e6, 0),
+        usageRow("2026-11-10", "deepseek-v4-flash", 2e6, 1.4),
+        usageRow("2026-11-11", "glm5.3", 4e6, 52),
+        usageRow("2026-11-13", "glm5.3", 1e6, 13),
+        usageRow("2026-11-13", "deepseek-v4-flash", 3e6, 2.1)
+    ],
+    has_more: false,
+    credits: {
+        period_start: "2026-11-01T00:00:00Z",
+        period_end: "2026-12-01T00:00:00Z",
+        allowance: 7000,
+        used: 1750,
+        remaining: 5250,
+        pack_credits: 0,
+        pack_expires_at: null,
+        frozen: false
+    }
+}
+
+const NOV13 = Date.parse("2026-11-13T12:00:00Z")
+
+test("monthStart and isoDay use UTC calendar days", () => {
+    assert.strictEqual(m.isoDay(NOV13), "2026-11-13")
+    assert.strictEqual(m.monthStart(NOV13), "2026-11-01")
+    assert.strictEqual(
+        m.monthStart(Date.parse("2026-12-31T23:59:59Z")),
+        "2026-12-01"
+    )
+})
+
+test("normalizeUsage sums tokens and credits per model and reads the fund", () => {
+    const u = m.normalizeUsage(USAGE_REPORT)
+    assert.strictEqual(u.partial, false)
+    assert.strictEqual(u.totalTokens, 11e6)
+    assert.strictEqual(u.credits.allowance, 7000)
+    assert.strictEqual(u.credits.used, 1750)
+    assert.strictEqual(u.credits.remaining, 5250)
+    assert.strictEqual(u.credits.startsAt, Date.parse("2026-11-01T00:00:00Z"))
+    assert.strictEqual(u.credits.resetsAt, Date.parse("2026-12-01T00:00:00Z"))
+    assert.strictEqual(u.credits.frozen, false)
+    // With a fund, the month credits are the fund's own figure.
+    assert.strictEqual(u.totalCredits, 1750)
+    const ds = u.models.find((x) => x.model === "deepseek-v4-flash")
+    assert.strictEqual(ds.tokens, 6e6)
+    assert.strictEqual(ds.requests, 3)
+    assert.strictEqual(ds.lastDate, "2026-11-13")
+    assert.ok(Math.abs(ds.credits - 3.5) < 1e-9)
+})
+
+test("normalizeUsage rejects other responses and tolerates a missing fund", () => {
+    assert.strictEqual(m.normalizeUsage(null), null)
+    assert.strictEqual(m.normalizeUsage({ object: "list", data: [] }), null)
+    const noFund = Object.assign({}, USAGE_REPORT, { credits: undefined })
+    const u = m.normalizeUsage(noFund)
+    assert.strictEqual(u.credits, null)
+    assert.ok(Math.abs(u.totalCredits - 68.5) < 1e-9)
+    // allowance 0 or garbage is not a fund
+    for (const bad of [{ allowance: 0 }, { allowance: "x" }, null]) {
+        const r = Object.assign({}, USAGE_REPORT, { credits: bad })
+        assert.strictEqual(m.normalizeUsage(r).credits, null)
+    }
+})
+
+test("normalizeUsage only counts the fund's period but keeps the last activity", () => {
+    const u = m.normalizeUsage({
+        object: "usage.report",
+        data: [
+            usageRow("2026-10-20", "glm5.3", 9e6, 0),
+            usageRow("2026-11-05", "glm5.3", 1e6, 5)
+        ],
+        credits: {
+            period_start: "2026-11-01T00:00:00Z",
+            period_end: "2026-12-01T00:00:00Z",
+            allowance: 100,
+            used: 5
+        }
+    })
+    assert.strictEqual(u.totalTokens, 1e6)
+    assert.strictEqual(u.credits.remaining, 95)
+    assert.strictEqual(u.models[0].lastDate, "2026-11-05")
+})
+
+test("normalizeUsage flags a paginated report as partial", () => {
+    const u = m.normalizeUsage(
+        Object.assign({}, USAGE_REPORT, { has_more: true })
+    )
+    assert.strictEqual(u.partial, true)
+})
+
+test("normalizeUsage marks a frozen fund and ignores broken rows", () => {
+    const u = m.normalizeUsage({
+        object: "usage.report",
+        data: [
+            null,
+            { model: "a" },
+            { date: "2026-11-02" },
+            usageRow("2026-11-02", "a", 5, 0)
+        ],
+        credits: {
+            period_start: "2026-11-01T00:00:00Z",
+            allowance: 10,
+            used: 1,
+            frozen: true
+        }
+    })
+    assert.strictEqual(u.credits.frozen, true)
+    assert.strictEqual(u.totalTokens, 5)
+})
+
+test("buildWindows makes the credit fund the main gauge with spend rows", () => {
+    const ws = m.buildWindows(FROZEN_QUOTA, m.normalizeUsage(USAGE_REPORT))
+    assert.deepStrictEqual(
+        ws.map((w) => [w.kind, w.model]),
+        [
+            ["credits", "credits"],
+            ["spend", "glm5.3"],
+            ["spend", "deepseek-v4-flash"],
+            ["spend", "qwen3.8-flash"]
+        ]
+    )
+    const fund = ws[0]
+    assert.strictEqual(fund.used, 1750)
+    assert.strictEqual(fund.cap, 7000)
+    assert.strictEqual(fund.utilization, 25)
+    assert.strictEqual(fund.resetsAt, Date.parse("2026-12-01T00:00:00Z"))
+    const glm = ws[1]
+    assert.strictEqual(glm.used, 5e6)
+    assert.strictEqual(glm.credits, 65)
+    assert.strictEqual(glm.windowDetail, undefined)
+    // Extra tokens still come from the quota.
+    assert.strictEqual(glm.extraUsable, false)
+    // Model with no activity: zero row, so hideUnused=false still lists it.
+    assert.strictEqual(ws[3].used, 0)
+    assert.strictEqual(ws[3].utilization, 0)
+    // Shares add up to 100 %.
+    const sum = ws.slice(1).reduce((s, w) => s + w.utilization, 0)
+    assert.ok(Math.abs(sum - 100) < 1e-9)
+})
+
+test("spend rows never drive the panel or raise alerts", () => {
+    const ws = m.buildWindows(FROZEN_QUOTA, m.normalizeUsage(USAGE_REPORT))
+    for (const mode of ["worst", "max", "fixed"]) {
+        const w = m.selectPanelWindow(ws, mode, "glm5.3", NOV13)
+        assert.strictEqual(w.kind, "credits", mode)
+    }
+    assert.strictEqual(m.windowLevel(ws[1], NOV13), "ok")
+    assert.strictEqual(m.projectionNote(ws[1], NOV13), "")
+    // Fund at 25 % with 12 of 30 days gone: nowhere near a warning.
+    assert.strictEqual(m.windowLevel(ws[0], NOV13), "ok")
+})
+
+test("the credit fund projects its pace like any other window", () => {
+    const u = m.normalizeUsage(USAGE_REPORT)
+    u.credits.used = 6000
+    const fund = m.buildWindows(FROZEN_QUOTA, u)[0]
+    assert.ok(m.exhaustMs(fund, NOV13) > 0)
+    assert.strictEqual(m.windowLevel(fund, NOV13), "crit")
+    assert.match(m.projectionNote(fund, NOV13), /se agota/)
+})
+
+test("a frozen fund is reported in its note", () => {
+    const u = m.normalizeUsage(USAGE_REPORT)
+    u.credits.frozen = true
+    const fund = m.buildWindows(FROZEN_QUOTA, u)[0]
+    assert.strictEqual(
+        m.projectionNote(fund, NOV13),
+        "fondo de créditos congelado"
+    )
+})
+
+test("without a fund, quota windows older than the last activity are stale", () => {
+    const noFund = Object.assign({}, USAGE_REPORT, { credits: undefined })
+    const ws = m.buildWindows(FROZEN_QUOTA, m.normalizeUsage(noFund))
+    const ds = ws.find((w) => w.model === "deepseek-v4-flash")
+    const glm = ws.find((w) => w.model === "glm5.3")
+    const qwen = ws.find((w) => w.model === "qwen3.8-flash")
+    assert.strictEqual(ds.stale, true)
+    assert.strictEqual(ds.staleSince, "2026-11-04")
+    assert.strictEqual(glm.stale, true)
+    assert.strictEqual(glm.staleSince, "2026-11-11")
+    assert.strictEqual(qwen.stale, undefined)
+    assert.strictEqual(m.windowLevel(glm, NOV13), "ok")
+    assert.strictEqual(
+        m.projectionNote(glm, NOV13),
+        "sin actualizar desde 2026-11-11"
+    )
+})
+
+test("a quota refreshed on the day of the last activity is not stale", () => {
+    const quota = {
+        periodStart: "2026-11-01",
+        models: [
+            {
+                model: "a",
+                tokensUsed: 5,
+                cap: 100,
+                updatedAt: "2026-11-13T08:00:00Z"
+            }
+        ]
+    }
+    const report = {
+        object: "usage.report",
+        data: [usageRow("2026-11-13", "a", 5, 0)]
+    }
+    const [w] = m.buildWindows(quota, m.normalizeUsage(report))
+    assert.strictEqual(w.stale, undefined)
+})
+
+test("stale windows are not picked for the panel while others are live", () => {
+    const quota = {
+        periodStart: "2026-11-01",
+        models: [
+            ...FROZEN_QUOTA.models,
+            {
+                model: "live",
+                tokensUsed: 10,
+                cap: 100,
+                periodEnd: "2026-12-01T00:00:00Z",
+                updatedAt: "2026-11-13"
+            }
+        ]
+    }
+    const report = {
+        object: "usage.report",
+        data: [
+            usageRow("2026-11-13", "live", 10, 0),
+            usageRow("2026-11-13", "glm5.3", 1, 0)
+        ]
+    }
+    const ws = m.buildWindows(quota, m.normalizeUsage(report))
+    assert.strictEqual(
+        m.selectPanelWindow(ws, "worst", null, NOV13).model,
+        "live"
+    )
+    assert.strictEqual(
+        m.selectPanelWindow(ws, "max", null, NOV13).model,
+        "live"
+    )
+    assert.strictEqual(
+        m.selectPanelWindow(ws, "fixed", "glm5.3", NOV13).model,
+        "live"
+    )
+    // If everything is stale the panel still has something to show.
+    const only = ws.filter((w) => w.stale)
+    assert.ok(m.selectPanelWindow(only, "worst", null, NOV13))
+})
+
+test("a paginated report keeps the fund and the quota rows", () => {
+    const u = m.normalizeUsage(
+        Object.assign({}, USAGE_REPORT, { has_more: true })
+    )
+    const ws = m.buildWindows(FROZEN_QUOTA, u)
+    assert.strictEqual(ws[0].kind, "credits")
+    assert.ok(ws.slice(1).every((w) => w.kind === undefined))
+    assert.strictEqual(ws.find((w) => w.model === "glm5.3").stale, true)
+})
+
+test("buildWindows falls back to the quota alone without a usage report", () => {
+    const ws = m.buildWindows(FROZEN_QUOTA, null)
+    assert.strictEqual(ws.length, 3)
+    assert.ok(ws.every((w) => w.stale === undefined && w.kind === undefined))
+    assert.deepStrictEqual(m.buildWindows(null, null), [])
+    assert.deepStrictEqual(
+        m.buildWindows(null, m.normalizeUsage(USAGE_REPORT)).map((w) => w.kind),
+        ["credits", "spend", "spend"]
+    )
+})
+
+test("usageLine derives the month from the usage report", () => {
+    const u = m.normalizeUsage(USAGE_REPORT)
+    assert.strictEqual(m.usageLine([], u), "mes: 11M · 1750 cr")
+    const noCredits = m.normalizeUsage({
+        object: "usage.report",
+        data: [usageRow("2026-11-02", "a", 2e6, 0)]
+    })
+    assert.strictEqual(m.usageLine([], noCredits), "mes: 2M")
+})
+
+test("fmtCredits and windowDetail format credits and rows", () => {
+    assert.strictEqual(m.fmtCredits(7000), "7000")
+    assert.strictEqual(m.fmtCredits(13.54), "13,5")
+    assert.strictEqual(m.fmtCredits(7), "7")
+    assert.strictEqual(m.fmtCredits(0), "0")
+    assert.strictEqual(m.fmtCredits(NaN), "0")
+    const ws = m.buildWindows(FROZEN_QUOTA, m.normalizeUsage(USAGE_REPORT))
+    assert.strictEqual(m.windowDetail(ws[0]), "1750 / 7000 cr")
+    assert.strictEqual(m.windowDetail(ws[1]), "65 cr · 5M")
+    assert.strictEqual(m.windowDetail(ws[3]), "0")
+    assert.strictEqual(m.windowDetail({ used: 1.5e6, cap: 3e9 }), "1,5M / 3B")
+})
