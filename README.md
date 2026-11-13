@@ -24,7 +24,7 @@ ritmo de consumo y el total del mes.
 <p align="center"><sub>El indicador en el panel: icono, anillo de nivel, porcentaje y días hasta el reset.</sub></p>
 
 <p align="center">
-  <img src="screenshots/popup.png" alt="Popup con una barra por modelo, la proyección del ritmo y el consumo agregado" width="380">
+  <img src="screenshots/popup.png" alt="Popup con el fondo de créditos, el gasto por modelo y el consumo del mes" width="359">
 </p>
 <p align="center"><sub>El popup: una barra por modelo, la proyección del ritmo, el consumo agregado y el botón al panel de NaN.</sub></p>
 
@@ -135,14 +135,24 @@ Desde ⚙ en el popup o en la configuración del widget:
 
 ## Cómo funciona
 
-La API de inferencia de NaN (`api.nan.builders/v1`, LiteLLM) no expone uso. El
-backend del panel web, `cloud-api.nan.builders`, sí, con la misma key como
-`Bearer`. Sus rutas salen del bundle JS del panel y **no tienen contrato
-público**: pueden cambiar sin aviso.
+Con la misma key como `Bearer` responden dos hosts. Ninguna ruta tiene
+contrato público (salen del bundle JS del panel o se descubrieron probando):
+pueden cambiar sin aviso.
 
 | ruta | uso aquí |
 | --- | --- |
-| `GET /api/usage/quota` | `periodStart` y `models[]` con `tokensUsed`, `cap`, `remaining`, `periodEnd`, `extraTokens`, `extraUsable`; alimenta las barras, la línea de tokens extra y el total del mes |
+| `GET api.nan.builders/v1/usage?start_date=…` | informe en vivo por día y modelo (`data[]`) y el fondo de créditos (`credits`, opcional): medidor principal, gasto por modelo, actividad y línea `mes:` |
+| `GET cloud-api.nan.builders/api/usage/quota` | `models[]` con `tokensUsed`, `cap`, `periodEnd`, `extraTokens`, `extraUsable`: topes y tokens extra, y **respaldo** si `/v1/usage` falla |
+
+Desde noviembre de 2026 NaN limita con un **fondo de créditos** y los
+contadores de `/api/usage/quota` dejaron de actualizarse. Por eso, si hay
+`credits`, el medidor del panel es `credits.used / credits.allowance` (con
+reinicio en `period_end` y proyección de ritmo), y las barras por modelo
+muestran los créditos que gastó cada uno (su parte del fondo, sin nivel de
+alerta). Sin fondo, se usan las barras de la cuota, pero una barra cuyo
+`updatedAt` es anterior a la última actividad del modelo se marca «sin
+actualizar desde …», no alerta y el panel no la elige. Se piden las dos rutas
+en cada sondeo; el widget solo da error si fallan las dos.
 
 Desde octubre de 2026 las rutas `GET /api/auth/me` y `GET /api/metrics/usage`
 responden `401 session_required` a las API keys (solo aceptan sesión del
