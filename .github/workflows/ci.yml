@@ -89,18 +89,18 @@ jobs:
           fi
           echo "Using $QMLLINT"
 
-          # The runner has no KDE QML modules (Ubuntu 24.04 only ships KF5), so
-          # import/property/type warnings would be all noise. Disable every
-          # warning category and keep only real syntax errors. Run qmllint
-          # without these flags on a Plasma 6 system for the full analysis.
-          OPTS="--alias disable --compiler disable --controls-sanity disable"
-          OPTS="$OPTS --deferred-property-id disable --deprecated disable"
-          OPTS="$OPTS --import disable --inheritance-cycle disable"
-          OPTS="$OPTS --multiline-strings disable"
-          OPTS="$OPTS --multiple-attached-objects disable"
-          OPTS="$OPTS --plugin disable --property disable --required disable"
-          OPTS="$OPTS --signal disable --type disable --unqualified disable"
-          OPTS="$OPTS --unused-imports disable --with disable"
+          # The runner has no KDE QML modules, so import/property/type
+          # warnings would be all noise. Disable every warning category and
+          # keep only real syntax errors. The categories are read from this
+          # qmllint's own --help, because Qt renames them between releases
+          # (alias -> alias-cycle, property -> missing-property, ...). Run
+          # qmllint without these flags on a Plasma 6 system for the full
+          # analysis.
+          OPTS=""
+          for cat in $("$QMLLINT" --help | grep -oE -- '--[A-Za-z.-]+ <lev' | sed 's/ <lev//'); do
+            OPTS="$OPTS $cat disable"
+          done
+          echo "Disabled categories:$OPTS"
 
           for f in $(
             find org.nan.usage/contents -type f \
