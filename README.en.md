@@ -25,7 +25,7 @@ sign up.
 <p align="center"><sub>The indicator on the panel: icon, ring gauge, percentage, and days until reset.</sub></p>
 
 <p align="center">
-  <img src="screenshots/popup.png" alt="Popup with a bar per model, rate projection, and aggregated consumption" width="380">
+  <img src="screenshots/popup.png" alt="Popup with the credit fund, per-model spend and the month total" width="359">
 </p>
 <p align="center"><sub>The popup: a bar per model, rate projection, aggregated consumption, and the button to the NaN dashboard.</sub></p>
 
@@ -136,14 +136,23 @@ From ⚙ in the popup or in the widget configuration:
 
 ## How it works
 
-NaN's inference API (`api.nan.builders/v1`, LiteLLM) doesn't expose usage. The
-web dashboard backend, `cloud-api.nan.builders`, does, with the same key as a
-`Bearer` token. These routes come from the web bundle and **have no public
-contract**: they may change without notice.
+Two hosts answer to the same key as a `Bearer` token. Neither route has a
+public contract (they come from the web bundle or were found by trial): they may
+change without notice.
 
 | route | use here |
 | --- | --- |
-| `GET /api/usage/quota` | `periodStart` and `models[]` with `tokensUsed`, `cap`, `remaining`, `periodEnd`, `extraTokens`, `extraUsable`; feeds the bars, the extra-tokens line and the month total |
+| `GET api.nan.builders/v1/usage?start_date=…` | live per-day, per-model report (`data[]`) and the credit fund (`credits`, optional): main gauge, per-model spend, activity and the `mes:` line |
+| `GET cloud-api.nan.builders/api/usage/quota` | `models[]` with `tokensUsed`, `cap`, `periodEnd`, `extraTokens`, `extraUsable`: caps and extra tokens, and the **fallback** if `/v1/usage` fails |
+
+Since November 2026 NaN limits usage with a **credit fund** and the counters of
+`/api/usage/quota` stopped updating. So when `credits` is present the panel
+gauge is `credits.used / credits.allowance` (resetting at `period_end`, with
+pace projection) and the per-model bars show the credits each model spent (its
+share of the fund, with no alert level). Without a fund the quota bars are used,
+but a bar whose `updatedAt` is older than the model's last activity is marked
+"sin actualizar desde …", raises no alert and is never picked for the panel.
+Both routes are requested on every poll; the widget only errors if both fail.
 
 Since October 2026 the routes `GET /api/auth/me` and `GET /api/metrics/usage`
 answer `401 session_required` to API keys (they only accept a browser session),
